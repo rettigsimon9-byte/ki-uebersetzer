@@ -27,7 +27,7 @@ def translate():
     try:
         message = client.messages.create(
             model='claude-haiku-4-5-20251001',
-            max_tokens=1024,
+            max_tokens=2048,
             messages=[{
                 'role': 'user',
                 'content': [
@@ -69,15 +69,29 @@ def translate():
         )
 
         raw = message.content[0].text.strip()
-        if raw.startswith('```'):
-            raw = raw.split('\n', 1)[1]
-            raw = raw.rsplit('```', 1)[0]
+
+        # Code-Fence entfernen (```json ... ``` oder ``` ... ```)
+        if '```' in raw:
+            parts = raw.split('```')
+            # Nimm den Teil nach dem ersten ``` (Index 1), entferne optionalen "json"-Bezeichner
+            raw = parts[1]
+            if raw.startswith('json'):
+                raw = raw[4:]
+            raw = raw.strip()
+
+        # Erstes { bis letztes } extrahieren (ignoriert Text davor/danach)
+        start = raw.find('{')
+        end   = raw.rfind('}')
+        if start != -1 and end != -1:
+            raw = raw[start:end+1]
 
         result = json.loads(raw)
         return jsonify({'success': True, **result})
 
-    except json.JSONDecodeError:
-        return jsonify({'success': False, 'error': 'Antwort konnte nicht verarbeitet werden.'}), 500
+    except json.JSONDecodeError as e:
+        # Im Fehlerfall die Rohausgabe zurückgeben um zu debuggen
+        raw_preview = locals().get('raw', '')[:300]
+        return jsonify({'success': False, 'error': f'JSON-Fehler: {e} | Antwort: {raw_preview}'}), 500
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
 
