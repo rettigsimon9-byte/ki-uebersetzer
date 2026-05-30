@@ -1,0 +1,599 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#0a0a0f">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <title>KI Übersetzer</title>
+  <link rel="manifest" href="/manifest.json">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:       #0a0a0f;
+      --surface:  #12121a;
+      --card:     #1a1a26;
+      --border:   #2a2a3a;
+      --accent:   #6366f1;
+      --accent2:  #818cf8;
+      --success:  #22c55e;
+      --warn:     #f59e0b;
+      --text:     #e2e8f0;
+      --muted:    #64748b;
+      --radius:   16px;
+    }
+
+    html, body {
+      height: 100%;
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      overflow: hidden;
+    }
+
+    /* ── Layout ─────────────────────────────────────────────── */
+    .app {
+      display: flex;
+      flex-direction: column;
+      height: 100dvh;
+      height: 100vh;
+    }
+
+    /* ── Header ─────────────────────────────────────────────── */
+    .header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 12px 16px;
+      padding-top: max(12px, env(safe-area-inset-top));
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+      z-index: 10;
+    }
+    .header-title {
+      font-size: 17px;
+      font-weight: 700;
+      letter-spacing: -0.3px;
+    }
+    .header-title span { color: var(--accent2); }
+    .btn-icon {
+      background: var(--card);
+      border: 1px solid var(--border);
+      color: var(--text);
+      width: 36px; height: 36px;
+      border-radius: 10px;
+      display: flex; align-items: center; justify-content: center;
+      cursor: pointer;
+      font-size: 16px;
+      transition: background .15s;
+    }
+    .btn-icon:active { background: var(--border); }
+
+    /* ── Camera area ─────────────────────────────────────────── */
+    .camera-wrap {
+      position: relative;
+      flex: 1 1 0;
+      background: #000;
+      overflow: hidden;
+      min-height: 0;
+    }
+    #video {
+      width: 100%; height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+    #canvas { display: none; }
+
+    /* Corner guides */
+    .guide {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+    }
+    .guide::before, .guide::after,
+    .guide .c1::before, .guide .c1::after,
+    .guide .c2::before, .guide .c2::after,
+    .guide .c3::before, .guide .c3::after {
+      content: '';
+      position: absolute;
+      width: 28px; height: 28px;
+      border-color: rgba(255,255,255,.7);
+      border-style: solid;
+    }
+    .guide::before  { top: 20px; left: 20px; border-width: 2px 0 0 2px; border-radius: 4px 0 0 0; }
+    .guide::after   { top: 20px; right: 20px; border-width: 2px 2px 0 0; border-radius: 0 4px 0 0; }
+    .guide .c1::before { bottom: 20px; left: 20px; border-width: 0 0 2px 2px; border-radius: 0 0 0 4px; }
+    .guide .c1::after  { bottom: 20px; right: 20px; border-width: 0 2px 2px 0; border-radius: 0 0 4px 0; }
+
+    /* Flash overlay */
+    .flash-overlay {
+      position: absolute;
+      inset: 0;
+      background: #fff;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity .05s;
+    }
+    .flash-overlay.active { opacity: .6; }
+
+    /* Scanning bar */
+    .scan-bar {
+      position: absolute;
+      left: 0; right: 0;
+      height: 2px;
+      background: linear-gradient(90deg, transparent, var(--accent), transparent);
+      top: 0;
+      display: none;
+      animation: scanMove 1.2s ease-in-out infinite;
+    }
+    @keyframes scanMove {
+      0%   { top: 5%; opacity: 1; }
+      50%  { top: 90%; opacity: .7; }
+      100% { top: 5%; opacity: 1; }
+    }
+    .scanning .scan-bar { display: block; }
+
+    /* Camera error */
+    .cam-error {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      padding: 32px;
+      text-align: center;
+      background: #000;
+      display: none;
+    }
+    .cam-error.visible { display: flex; }
+    .cam-error-icon { font-size: 48px; }
+    .cam-error-text { color: var(--muted); font-size: 14px; line-height: 1.5; }
+
+    /* ── Bottom panel ────────────────────────────────────────── */
+    .bottom {
+      background: var(--surface);
+      border-top: 1px solid var(--border);
+      flex-shrink: 0;
+      display: flex;
+      flex-direction: column;
+      max-height: 55vh;
+    }
+
+    /* Shutter row */
+    .shutter-row {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 24px;
+      padding: 16px;
+      flex-shrink: 0;
+    }
+    .btn-shutter {
+      width: 72px; height: 72px;
+      border-radius: 50%;
+      background: var(--accent);
+      border: none;
+      cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 26px;
+      color: #fff;
+      box-shadow: 0 0 0 4px rgba(99,102,241,.25);
+      transition: transform .1s, background .15s;
+      flex-shrink: 0;
+    }
+    .btn-shutter:active { transform: scale(.93); }
+    .btn-shutter:disabled { background: var(--border); box-shadow: none; cursor: default; }
+
+    .btn-flip {
+      background: var(--card);
+      border: 1px solid var(--border);
+      color: var(--text);
+      width: 48px; height: 48px;
+      border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      cursor: pointer;
+      font-size: 20px;
+    }
+    .btn-flip:active { background: var(--border); }
+
+    /* Result card */
+    .result-area {
+      overflow-y: auto;
+      padding: 0 16px 16px;
+      padding-bottom: max(16px, env(safe-area-inset-bottom));
+      flex: 1 1 0;
+      min-height: 0;
+    }
+
+    .result-card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      overflow: hidden;
+    }
+
+    .result-placeholder {
+      padding: 20px;
+      text-align: center;
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    .result-lang-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: rgba(99,102,241,.15);
+      color: var(--accent2);
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: .5px;
+      padding: 4px 10px;
+      border-radius: 20px;
+    }
+
+    .result-section {
+      padding: 14px 16px;
+    }
+    .result-section + .result-section {
+      border-top: 1px solid var(--border);
+    }
+    .result-label {
+      font-size: 10px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: .8px;
+      color: var(--muted);
+      margin-bottom: 6px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .result-text {
+      font-size: 15px;
+      line-height: 1.55;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+    .result-text.translation {
+      color: #a5b4fc;
+      font-weight: 500;
+    }
+
+    .btn-copy {
+      background: none;
+      border: 1px solid var(--border);
+      color: var(--muted);
+      font-size: 11px;
+      padding: 3px 8px;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: color .15s, border-color .15s;
+    }
+    .btn-copy:active, .btn-copy.copied {
+      color: var(--success);
+      border-color: var(--success);
+    }
+
+    /* Loading state */
+    .loading-card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 24px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      font-size: 14px;
+      color: var(--muted);
+    }
+    .spinner {
+      width: 20px; height: 20px;
+      border: 2px solid var(--border);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin .7s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* Error */
+    .error-card {
+      background: rgba(239,68,68,.08);
+      border: 1px solid rgba(239,68,68,.3);
+      border-radius: var(--radius);
+      padding: 14px 16px;
+      font-size: 13px;
+      color: #fca5a5;
+      display: flex;
+      gap: 8px;
+      align-items: flex-start;
+    }
+
+    /* History pill */
+    .history-toggle {
+      background: none;
+      border: none;
+      color: var(--muted);
+      font-size: 12px;
+      cursor: pointer;
+      padding: 4px 0;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      width: 100%;
+      justify-content: center;
+      margin-top: 8px;
+    }
+
+    .history-list {
+      display: none;
+      flex-direction: column;
+      gap: 8px;
+      margin-top: 8px;
+    }
+    .history-list.open { display: flex; }
+
+    .history-item {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 10px 14px;
+      font-size: 12px;
+    }
+    .history-item .hi-lang { color: var(--muted); font-size: 10px; margin-bottom: 4px; }
+    .history-item .hi-tr   { color: var(--accent2); line-height: 1.4; }
+    .history-item .hi-orig { color: var(--muted); margin-top: 2px; font-style: italic; line-height: 1.3; }
+  </style>
+</head>
+<body>
+
+<div class="app">
+
+  <!-- Header -->
+  <header class="header">
+    <div class="header-title">KI <span>Übersetzer</span></div>
+    <div style="display:flex;gap:8px">
+      <button class="btn-icon" id="btnHistory" title="Verlauf" onclick="toggleHistory()">🕐</button>
+    </div>
+  </header>
+
+  <!-- Camera -->
+  <div class="camera-wrap" id="cameraWrap">
+    <video id="video" autoplay playsinline muted></video>
+    <canvas id="canvas"></canvas>
+    <div class="guide"><div class="c1"></div></div>
+    <div class="scan-bar"></div>
+    <div class="flash-overlay" id="flashOverlay"></div>
+    <div class="cam-error" id="camError">
+      <div class="cam-error-icon">📷</div>
+      <div style="font-size:16px;font-weight:600">Kamera nicht verfügbar</div>
+      <div class="cam-error-text">
+        Bitte erlaube den Kamera-Zugriff in den Browser-Einstellungen und lade die Seite neu.
+        <br><br>
+        Auf dem iPhone: Einstellungen → Safari → Kamera → Erlauben
+      </div>
+      <button onclick="startCamera()" style="margin-top:8px;background:var(--accent);color:#fff;border:none;padding:10px 20px;border-radius:10px;font-size:14px;cursor:pointer">
+        Nochmal versuchen
+      </button>
+    </div>
+  </div>
+
+  <!-- Bottom panel -->
+  <div class="bottom">
+    <div class="shutter-row">
+      <button class="btn-flip" id="btnFlip" onclick="flipCamera()" title="Kamera wechseln">🔄</button>
+      <button class="btn-shutter" id="btnCapture" onclick="capture()">📸</button>
+      <div style="width:48px"></div>
+    </div>
+
+    <div class="result-area" id="resultArea">
+      <div class="result-card">
+        <div class="result-placeholder">📷 Foto aufnehmen → KI übersetzt automatisch</div>
+      </div>
+
+      <button class="history-toggle" id="historyToggle" onclick="toggleHistory()" style="display:none">
+        <span id="histArrow">▾</span> Verlauf (<span id="histCount">0</span>)
+      </button>
+      <div class="history-list" id="historyList"></div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+  let stream = null;
+  let facingMode = 'environment';
+  let history = [];
+  let histOpen = false;
+
+  // ── Camera ─────────────────────────────────────────────────
+  async function startCamera() {
+    document.getElementById('camError').classList.remove('visible');
+    const constraints = {
+      video: {
+        facingMode: { ideal: facingMode },
+        width: { ideal: 1920 },
+        height: { ideal: 1080 },
+      },
+      audio: false,
+    };
+    try {
+      if (stream) { stream.getTracks().forEach(t => t.stop()); }
+      stream = await navigator.mediaDevices.getUserMedia(constraints);
+      document.getElementById('video').srcObject = stream;
+    } catch (err) {
+      console.error('Camera error:', err);
+      document.getElementById('camError').classList.add('visible');
+    }
+  }
+
+  async function flipCamera() {
+    facingMode = facingMode === 'environment' ? 'user' : 'environment';
+    await startCamera();
+  }
+
+  // ── Capture & Translate ─────────────────────────────────────
+  async function capture() {
+    const video   = document.getElementById('video');
+    const canvas  = document.getElementById('canvas');
+    const btn     = document.getElementById('btnCapture');
+    const wrap    = document.getElementById('cameraWrap');
+    const flash   = document.getElementById('flashOverlay');
+
+    if (!stream) { alert('Kamera nicht verfügbar.'); return; }
+
+    // Flash
+    flash.classList.add('active');
+    setTimeout(() => flash.classList.remove('active'), 120);
+
+    // Capture frame
+    canvas.width  = video.videoWidth  || 640;
+    canvas.height = video.videoHeight || 480;
+    canvas.getContext('2d').drawImage(video, 0, 0, canvas.width, canvas.height);
+    const imageData = canvas.toDataURL('image/jpeg', 0.85);
+
+    // UI: loading
+    btn.disabled = true;
+    wrap.classList.add('scanning');
+    showLoading();
+
+    try {
+      const res  = await fetch('/api/translate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ image: imageData }),
+      });
+      const data = await res.json();
+
+      if (!data.success) {
+        showError(data.error || 'Unbekannter Fehler');
+      } else if (data.kein_text) {
+        showNoText();
+      } else {
+        showResult(data);
+        addToHistory(data);
+      }
+    } catch (err) {
+      showError('Netzwerkfehler: ' + err.message);
+    } finally {
+      btn.disabled = false;
+      wrap.classList.remove('scanning');
+    }
+  }
+
+  // ── Result rendering ────────────────────────────────────────
+  function showLoading() {
+    document.getElementById('resultArea').innerHTML = `
+      <div class="loading-card">
+        <div class="spinner"></div>
+        KI analysiert Bild…
+      </div>
+    `;
+  }
+
+  function showError(msg) {
+    document.getElementById('resultArea').innerHTML = `
+      <div class="error-card">⚠️ <span>${escHtml(msg)}</span></div>
+    `;
+  }
+
+  function showNoText() {
+    document.getElementById('resultArea').innerHTML = `
+      <div class="result-card">
+        <div class="result-placeholder">🔍 Kein Text erkannt — halte die Kamera näher ans Dokument</div>
+      </div>
+    `;
+  }
+
+  function showResult(data) {
+    const areaHtml = `
+      <div class="result-card">
+        <div class="result-section" style="padding-bottom:10px">
+          <span class="result-lang-badge">🌍 ${escHtml(data.erkannte_sprache || 'Unbekannt')} → Deutsch</span>
+        </div>
+        <div class="result-section">
+          <div class="result-label">
+            Deutsche Übersetzung
+            <button class="btn-copy" onclick="copyText(this, ${JSON.stringify(data.uebersetzung)})">Kopieren</button>
+          </div>
+          <div class="result-text translation">${escHtml(data.uebersetzung)}</div>
+        </div>
+        <div class="result-section">
+          <div class="result-label">Original</div>
+          <div class="result-text" style="color:var(--muted);font-size:13px">${escHtml(data.original)}</div>
+        </div>
+      </div>
+      ${renderHistoryToggle()}
+    `;
+    document.getElementById('resultArea').innerHTML = areaHtml;
+    renderHistoryItems();
+  }
+
+  // ── History ─────────────────────────────────────────────────
+  function addToHistory(data) {
+    history.unshift(data);
+    if (history.length > 20) history.pop();
+  }
+
+  function renderHistoryToggle() {
+    if (history.length === 0) return '';
+    return `
+      <button class="history-toggle" id="historyToggle" onclick="toggleHistory()">
+        <span id="histArrow">${histOpen ? '▴' : '▾'}</span> Verlauf (${history.length})
+      </button>
+      <div class="history-list ${histOpen ? 'open' : ''}" id="historyList"></div>
+    `;
+  }
+
+  function toggleHistory() {
+    histOpen = !histOpen;
+    const list  = document.getElementById('historyList');
+    const arrow = document.getElementById('histArrow');
+    if (!list) return;
+    list.classList.toggle('open', histOpen);
+    if (arrow) arrow.textContent = histOpen ? '▴' : '▾';
+    if (histOpen) renderHistoryItems();
+  }
+
+  function renderHistoryItems() {
+    const list = document.getElementById('historyList');
+    if (!list) return;
+    list.innerHTML = history.slice(1).map(d => `
+      <div class="history-item">
+        <div class="hi-lang">${escHtml(d.erkannte_sprache || '?')} → Deutsch</div>
+        <div class="hi-tr">${escHtml(d.uebersetzung)}</div>
+        <div class="hi-orig">${escHtml(truncate(d.original, 80))}</div>
+      </div>
+    `).join('');
+  }
+
+  // ── Helpers ─────────────────────────────────────────────────
+  async function copyText(btn, text) {
+    try {
+      await navigator.clipboard.writeText(text);
+      btn.textContent = 'Kopiert ✓';
+      btn.classList.add('copied');
+      setTimeout(() => { btn.textContent = 'Kopieren'; btn.classList.remove('copied'); }, 2000);
+    } catch {}
+  }
+
+  function escHtml(str) {
+    return String(str ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+
+  function truncate(str, n) {
+    return str && str.length > n ? str.slice(0, n) + '…' : (str || '');
+  }
+
+  // ── Init ─────────────────────────────────────────────────────
+  startCamera();
+</script>
+</body>
+</html>
