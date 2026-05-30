@@ -317,12 +317,12 @@
       </div>
     </div>
 
-    <div class="mode-card" style="opacity:.45;cursor:default">
+    <div class="mode-card" onclick="openMode('plant')">
       <div class="mode-icon">🌿</div>
       <div>
-        <div class="mode-name">Pflanzen</div>
-        <div class="mode-desc">Pflanze erkennen & Infos anzeigen</div>
-        <div class="mode-badge">Bald</div>
+        <div class="mode-name">Pflanzen & Bäume</div>
+        <div class="mode-desc">Pflanze erkennen, Pflege & giftig für Katzen?</div>
+        <div class="mode-badge">KI Erkennung</div>
       </div>
     </div>
 
@@ -402,8 +402,9 @@
   let stream = null, facingMode = 'environment', currentMode = 'translate';
 
   const MODES = {
-    translate: { label: '🌍 Übersetzer', pill: '🌍 Übersetzer',  icon: '🌍', endpoint: '/api/translate' },
-    landmark:  { label: '🗺️ Sehenswürdigkeit', pill: '🗺️ Sehenswürdigkeit', icon: '🗺️', endpoint: '/api/landmark'  },
+    translate: { label: '🌍 Übersetzer',        pill: '🌍 Übersetzer',        icon: '🌍', endpoint: '/api/translate' },
+    landmark:  { label: '🗺️ Sehenswürdigkeit',  pill: '🗺️ Sehenswürdigkeit',  icon: '🗺️', endpoint: '/api/landmark'  },
+    plant:     { label: '🌿 Pflanzen & Bäume',  pill: '🌿 Pflanzen & Bäume',  icon: '🌿', endpoint: '/api/plant'     },
   };
 
   // ── Navigation ───────────────────────────────────────────────
@@ -480,7 +481,9 @@
         body: JSON.stringify({ image: imageData }),
       });
       const data = await res.json();
-      currentMode === 'translate' ? renderTranslate(data, imageData) : renderLandmark(data);
+      if (currentMode === 'translate') renderTranslate(data, imageData);
+      else if (currentMode === 'landmark') renderLandmark(data);
+      else if (currentMode === 'plant') renderPlant(data);
     } catch (e) {
       document.getElementById('resContent').innerHTML =
         `<div class="msg-box error">⚠️ Netzwerkfehler: ${esc(e.message)}</div>`;
@@ -554,6 +557,61 @@
           <div class="rc-text body">${esc(data.besuchertipp)}</div>
         </div>` : ''}
       </div>`;
+  }
+
+  // ── Pflanzen-Ergebnis ────────────────────────────────────────
+  function renderPlant(data) {
+    if (!data.success) { showError(data.error); return; }
+    if (!data.gefunden) {
+      document.getElementById('resContent').innerHTML =
+        `<div class="msg-box info">🌿 Keine Pflanze erkannt – versuche es näher und bei gutem Licht.</div>`; return;
+    }
+
+    const sicherheit = { hoch: '🟢 Hoch', mittel: '🟡 Mittel', niedrig: '🔴 Niedrig' };
+    const katzenGiftig = (data.giftig_katzen || '').toLowerCase();
+    const katzenIcon = katzenGiftig.startsWith('ja') ? '☠️' : katzenGiftig.startsWith('nein') ? '✅' : '⚠️';
+    const katzenBg   = katzenGiftig.startsWith('ja') ? 'background:rgba(239,68,68,.12);border:1px solid rgba(239,68,68,.35)' :
+                       katzenGiftig.startsWith('nein') ? 'background:rgba(34,197,94,.1);border:1px solid rgba(34,197,94,.3)' :
+                       'background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.3)';
+
+    const pflege = (data.pflege || []).map(p => `<div class="fact-chip">🌱 ${esc(p)}</div>`).join('');
+    const fakten = (data.fakten || []).map(f => `<div class="fact-chip">${esc(f)}</div>`).join('');
+
+    document.getElementById('resContent').innerHTML = `
+      <div class="res-card">
+        <div class="rc-row">
+          <div class="rc-text big">${esc(data.name)}</div>
+          <div class="rc-text sub" style="margin-top:4px;font-style:italic">${esc(data.wissenschaftlich)}</div>
+          <div style="margin-top:6px;display:flex;gap:8px;flex-wrap:wrap">
+            <span class="fact-chip">${esc(data.typ)}</span>
+            <span class="fact-chip">📍 ${esc(data.herkunft)}</span>
+            <span class="fact-chip" style="font-size:11px">Sicherheit: ${sicherheit[data.erkennungssicherheit] || data.erkennungssicherheit}</span>
+          </div>
+        </div>
+        <div class="rc-row">
+          <div class="rc-label">Beschreibung</div>
+          <div class="rc-text body">${esc(data.beschreibung)}</div>
+        </div>
+      </div>
+
+      <!-- Katzen-Warnung prominent -->
+      <div style="border-radius:14px;padding:14px 16px;margin-bottom:10px;${katzenBg}">
+        <div style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);margin-bottom:6px">
+          🐱 Giftig für Katzen?
+        </div>
+        <div style="font-size:15px;font-weight:600;color:var(--text)">${katzenIcon} ${esc(data.giftig_katzen)}</div>
+      </div>
+
+      <div class="res-card">
+        <div class="rc-row">
+          <div class="rc-label">⚠️ Giftig für Menschen?</div>
+          <div class="rc-text body">${esc(data.giftig_menschen)}</div>
+        </div>
+      </div>
+
+      ${pflege ? `<div class="res-card"><div class="rc-row"><div class="rc-label">Pflege-Tipps</div></div><div class="facts-wrap">${pflege}</div></div>` : ''}
+      ${fakten ? `<div class="res-card"><div class="rc-row"><div class="rc-label">Wissenswertes</div></div><div class="facts-wrap">${fakten}</div></div>` : ''}
+    `;
   }
 
   function showError(msg) {

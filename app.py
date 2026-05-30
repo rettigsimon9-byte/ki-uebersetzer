@@ -101,6 +101,36 @@ def landmark():
         return jsonify({'success': False, 'error': str(e)}), 500
 
 
+@app.route('/api/plant', methods=['POST'])
+def plant():
+    try:
+        image_data, media_type = parse_image(request.get_json())
+        result = call_claude(image_data, media_type, (
+            'Analysiere dieses Bild und erkenne die abgebildete Pflanze, Blume oder den Baum.\n\n'
+            'Antworte NUR mit diesem JSON (kein Markdown, auf Deutsch):\n'
+            '{\n'
+            '  "gefunden": true,\n'
+            '  "name": "Deutscher Alltagsname",\n'
+            '  "wissenschaftlich": "Lateinischer Name",\n'
+            '  "typ": "z.B. Baum / Strauch / Blume / Zimmerpflanze / Kräuter",\n'
+            '  "herkunft": "Ursprungsregion",\n'
+            '  "beschreibung": "2-3 Sätze zur Pflanze",\n'
+            '  "pflege": ["Pflegetipp 1", "Pflegetipp 2", "Pflegetipp 3"],\n'
+            '  "giftig_menschen": "ja / nein / teilweise – kurze Erklärung",\n'
+            '  "giftig_katzen": "ja / nein / teilweise – kurze Erklärung was passiert",\n'
+            '  "fakten": ["Fakt 1", "Fakt 2"],\n'
+            '  "erkennungssicherheit": "hoch / mittel / niedrig"\n'
+            '}\n\n'
+            'Falls keine Pflanze erkennbar:\n'
+            '{"gefunden":false,"name":"","wissenschaftlich":"","typ":"","herkunft":"","beschreibung":"Keine Pflanze erkannt.","pflege":[],"giftig_menschen":"","giftig_katzen":"","fakten":[],"erkennungssicherheit":"niedrig"}'
+        ), max_tokens=1500)
+        return jsonify({'success': True, **result})
+    except json.JSONDecodeError as e:
+        return jsonify({'success': False, 'error': f'JSON-Fehler: {e}'}), 500
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5003))
     app.run(host='0.0.0.0', port=port, debug=False)
