@@ -7,6 +7,17 @@ app = Flask(__name__)
 client = anthropic.Anthropic(api_key=os.environ.get('ANTHROPIC_API_KEY'))
 
 
+def parse_image(data):
+    image_data = data.get('image', '')
+    beschreibung = data.get('beschreibung', '').strip()
+    if ',' in image_data:
+        part, image_data = image_data.split(',', 1)
+        media_type = part.split(':')[1].split(';')[0] if ':' in part else 'image/jpeg'
+    else:
+        media_type = 'image/jpeg'
+    return image_data, media_type, beschreibung
+
+
 def call_claude(image_data, media_type, prompt, max_tokens=2048):
     message = client.messages.create(
         model='claude-haiku-4-5-20251001',
@@ -14,10 +25,7 @@ def call_claude(image_data, media_type, prompt, max_tokens=2048):
         messages=[{
             'role': 'user',
             'content': [
-                {
-                    'type': 'image',
-                    'source': {'type': 'base64', 'media_type': media_type, 'data': image_data}
-                },
+                {'type': 'image', 'source': {'type': 'base64', 'media_type': media_type, 'data': image_data}},
                 {'type': 'text', 'text': prompt}
             ]
         }]
@@ -35,14 +43,10 @@ def call_claude(image_data, media_type, prompt, max_tokens=2048):
     return json.loads(raw)
 
 
-def parse_image(data):
-    image_data = data.get('image', '')
-    if ',' in image_data:
-        part, image_data = image_data.split(',', 1)
-        media_type = part.split(':')[1].split(';')[0] if ':' in part else 'image/jpeg'
-    else:
-        media_type = 'image/jpeg'
-    return image_data, media_type
+def with_hint(prompt, beschreibung):
+    if beschreibung:
+        return prompt + f'\n\nZusätzlicher Hinweis vom Nutzer: "{beschreibung}"'
+    return prompt
 
 
 @app.route('/')
@@ -53,8 +57,8 @@ def index():
 @app.route('/api/translate', methods=['POST'])
 def translate():
     try:
-        image_data, media_type = parse_image(request.get_json())
-        result = call_claude(image_data, media_type, (
+        image_data, media_type, beschreibung = parse_image(request.get_json())
+        base = (
             'Analysiere dieses Bild. Erkenne alle Textstellen und übersetze sie auf Deutsch.\n'
             'Gib für jeden Textblock seine ungefähre Position im Bild als Prozentwert an.\n\n'
             'Antworte NUR mit diesem JSON (kein Markdown):\n'
@@ -66,7 +70,8 @@ def translate():
             '}\n'
             'x/y = linke obere Ecke in % der Bildbreite/höhe. breite/hoehe in %.\n'
             'Falls kein Text: {"sprache":"","blocks":[],"kein_text":true}'
-        ))
+        )
+        result = call_claude(image_data, media_type, with_hint(base, beschreibung))
         return jsonify({'success': True, **result})
     except json.JSONDecodeError as e:
         return jsonify({'success': False, 'error': f'JSON-Fehler: {e}'}), 500
@@ -77,8 +82,8 @@ def translate():
 @app.route('/api/landmark', methods=['POST'])
 def landmark():
     try:
-        image_data, media_type = parse_image(request.get_json())
-        result = call_claude(image_data, media_type, (
+        image_data, media_type, beschreibung = parse_image(request.get_json())
+        base = (
             'Analysiere dieses Bild. Erkenne das abgebildete Gebäude, Denkmal oder die Sehenswürdigkeit.\n\n'
             'Antworte NUR mit diesem JSON (kein Markdown, auf Deutsch):\n'
             '{\n'
@@ -91,9 +96,10 @@ def landmark():
             '  "fakten": ["Fakt 1", "Fakt 2", "Fakt 3"],\n'
             '  "besuchertipp": "Praktischer Tipp für Besucher"\n'
             '}\n\n'
-            'Falls kein Gebäude/Sehenswürdigkeit erkennbar:\n'
+            'Falls kein Gebäude erkennbar:\n'
             '{"gefunden":false,"name":"","typ":"","ort":"","kurzbeschreibung":"Kein bekanntes Gebäude erkannt.","geschichte":"","fakten":[],"besuchertipp":""}'
-        ), max_tokens=1500)
+        )
+        result = call_claude(image_data, media_type, with_hint(base, beschreibung), max_tokens=1500)
         return jsonify({'success': True, **result})
     except json.JSONDecodeError as e:
         return jsonify({'success': False, 'error': f'JSON-Fehler: {e}'}), 500
@@ -104,26 +110,27 @@ def landmark():
 @app.route('/api/plant', methods=['POST'])
 def plant():
     try:
-        image_data, media_type = parse_image(request.get_json())
-        result = call_claude(image_data, media_type, (
+        image_data, media_type, beschreibung = parse_image(request.get_json())
+        base = (
             'Analysiere dieses Bild und erkenne die abgebildete Pflanze, Blume oder den Baum.\n\n'
             'Antworte NUR mit diesem JSON (kein Markdown, auf Deutsch):\n'
             '{\n'
             '  "gefunden": true,\n'
             '  "name": "Deutscher Alltagsname",\n'
             '  "wissenschaftlich": "Lateinischer Name",\n'
-            '  "typ": "z.B. Baum / Strauch / Blume / Zimmerpflanze / Kräuter",\n'
+            '  "typ": "z.B. Baum / Strauch / Blume / Zimmerpflanze",\n'
             '  "herkunft": "Ursprungsregion",\n'
             '  "beschreibung": "2-3 Sätze zur Pflanze",\n'
             '  "pflege": ["Pflegetipp 1", "Pflegetipp 2", "Pflegetipp 3"],\n'
             '  "giftig_menschen": "ja / nein / teilweise – kurze Erklärung",\n'
-            '  "giftig_katzen": "ja / nein / teilweise – kurze Erklärung was passiert",\n'
+            '  "giftig_katzen": "ja / nein / teilweise – kurze Erklärung",\n'
             '  "fakten": ["Fakt 1", "Fakt 2"],\n'
             '  "erkennungssicherheit": "hoch / mittel / niedrig"\n'
             '}\n\n'
             'Falls keine Pflanze erkennbar:\n'
             '{"gefunden":false,"name":"","wissenschaftlich":"","typ":"","herkunft":"","beschreibung":"Keine Pflanze erkannt.","pflege":[],"giftig_menschen":"","giftig_katzen":"","fakten":[],"erkennungssicherheit":"niedrig"}'
-        ), max_tokens=1500)
+        )
+        result = call_claude(image_data, media_type, with_hint(base, beschreibung), max_tokens=1500)
         return jsonify({'success': True, **result})
     except json.JSONDecodeError as e:
         return jsonify({'success': False, 'error': f'JSON-Fehler: {e}'}), 500
@@ -134,8 +141,8 @@ def plant():
 @app.route('/api/repair', methods=['POST'])
 def repair():
     try:
-        image_data, media_type = parse_image(request.get_json())
-        result = call_claude(image_data, media_type, (
+        image_data, media_type, beschreibung = parse_image(request.get_json())
+        base = (
             'Analysiere dieses Bild. Erkenne das Objekt, den Schaden oder die Fehlermeldung.\n'
             'Gib eine praktische Reparaturanleitung auf Deutsch.\n\n'
             'Antworte NUR mit diesem JSON (kein Markdown):\n'
@@ -150,11 +157,12 @@ def repair():
             '  "profi_noetig": false,\n'
             '  "profi_begruendung": "Nur falls Profi nötig: Warum",\n'
             '  "kosten_schaetzung": "z.B. 0€ (selbst) / 20-50€ (Teile) / 100-300€ (Werkstatt)",\n'
-            '  "sicherheitshinweis": "Wichtiger Hinweis falls gefährlich, sonst leer lassen"\n'
+            '  "sicherheitshinweis": "Wichtiger Hinweis falls gefährlich, sonst leer"\n'
             '}\n\n'
-            'Falls kein Problem/Objekt erkennbar:\n'
-            '{"gefunden":false,"objekt":"","problem":"Kein Schaden oder Objekt erkannt.","ursachen":[],"schritte":[],"werkzeug":[],"schwierigkeit":"","profi_noetig":false,"profi_begruendung":"","kosten_schaetzung":"","sicherheitshinweis":""}'
-        ), max_tokens=1500)
+            'Falls kein Problem erkennbar:\n'
+            '{"gefunden":false,"objekt":"","problem":"Kein Schaden erkannt.","ursachen":[],"schritte":[],"werkzeug":[],"schwierigkeit":"","profi_noetig":false,"profi_begruendung":"","kosten_schaetzung":"","sicherheitshinweis":""}'
+        )
+        result = call_claude(image_data, media_type, with_hint(base, beschreibung), max_tokens=1500)
         return jsonify({'success': True, **result})
     except json.JSONDecodeError as e:
         return jsonify({'success': False, 'error': f'JSON-Fehler: {e}'}), 500
