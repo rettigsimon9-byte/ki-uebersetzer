@@ -131,6 +131,37 @@ def plant():
         return jsonify({'success': False, 'error': str(e)}), 500
 
 
+@app.route('/api/repair', methods=['POST'])
+def repair():
+    try:
+        image_data, media_type = parse_image(request.get_json())
+        result = call_claude(image_data, media_type, (
+            'Analysiere dieses Bild. Erkenne das Objekt, den Schaden oder die Fehlermeldung.\n'
+            'Gib eine praktische Reparaturanleitung auf Deutsch.\n\n'
+            'Antworte NUR mit diesem JSON (kein Markdown):\n'
+            '{\n'
+            '  "gefunden": true,\n'
+            '  "objekt": "Was ist das (z.B. Wasserhahn, Autoreifen, Waschmaschine)",\n'
+            '  "problem": "Was ist das erkannte Problem/der Schaden",\n'
+            '  "ursachen": ["Mögliche Ursache 1", "Ursache 2"],\n'
+            '  "schritte": ["Schritt 1", "Schritt 2", "Schritt 3"],\n'
+            '  "werkzeug": ["Werkzeug 1", "Werkzeug 2"],\n'
+            '  "schwierigkeit": "einfach / mittel / schwer",\n'
+            '  "profi_noetig": false,\n'
+            '  "profi_begruendung": "Nur falls Profi nötig: Warum",\n'
+            '  "kosten_schaetzung": "z.B. 0€ (selbst) / 20-50€ (Teile) / 100-300€ (Werkstatt)",\n'
+            '  "sicherheitshinweis": "Wichtiger Hinweis falls gefährlich, sonst leer lassen"\n'
+            '}\n\n'
+            'Falls kein Problem/Objekt erkennbar:\n'
+            '{"gefunden":false,"objekt":"","problem":"Kein Schaden oder Objekt erkannt.","ursachen":[],"schritte":[],"werkzeug":[],"schwierigkeit":"","profi_noetig":false,"profi_begruendung":"","kosten_schaetzung":"","sicherheitshinweis":""}'
+        ), max_tokens=1500)
+        return jsonify({'success': True, **result})
+    except json.JSONDecodeError as e:
+        return jsonify({'success': False, 'error': f'JSON-Fehler: {e}'}), 500
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5003))
     app.run(host='0.0.0.0', port=port, debug=False)

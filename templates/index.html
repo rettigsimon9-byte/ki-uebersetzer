@@ -308,12 +308,12 @@
       </div>
     </div>
 
-    <div class="mode-card" style="opacity:.45;cursor:default">
-      <div class="mode-icon">🧾</div>
+    <div class="mode-card" onclick="openMode('repair')">
+      <div class="mode-icon">🔧</div>
       <div>
-        <div class="mode-name">Kassenbon</div>
-        <div class="mode-desc">Bon scannen & Ausgaben erfassen</div>
-        <div class="mode-badge">Bald</div>
+        <div class="mode-name">Reparatur-Helfer</div>
+        <div class="mode-desc">Schaden fotografieren → Anleitung & Werkzeug</div>
+        <div class="mode-badge">KI Analyse</div>
       </div>
     </div>
 
@@ -405,6 +405,7 @@
     translate: { label: '🌍 Übersetzer',        pill: '🌍 Übersetzer',        icon: '🌍', endpoint: '/api/translate' },
     landmark:  { label: '🗺️ Sehenswürdigkeit',  pill: '🗺️ Sehenswürdigkeit',  icon: '🗺️', endpoint: '/api/landmark'  },
     plant:     { label: '🌿 Pflanzen & Bäume',  pill: '🌿 Pflanzen & Bäume',  icon: '🌿', endpoint: '/api/plant'     },
+    repair:    { label: '🔧 Reparatur-Helfer',  pill: '🔧 Reparatur-Helfer',  icon: '🔧', endpoint: '/api/repair'    },
   };
 
   // ── Navigation ───────────────────────────────────────────────
@@ -484,6 +485,7 @@
       if (currentMode === 'translate') renderTranslate(data, imageData);
       else if (currentMode === 'landmark') renderLandmark(data);
       else if (currentMode === 'plant') renderPlant(data);
+      else if (currentMode === 'repair') renderRepair(data);
     } catch (e) {
       document.getElementById('resContent').innerHTML =
         `<div class="msg-box error">⚠️ Netzwerkfehler: ${esc(e.message)}</div>`;
@@ -611,6 +613,65 @@
 
       ${pflege ? `<div class="res-card"><div class="rc-row"><div class="rc-label">Pflege-Tipps</div></div><div class="facts-wrap">${pflege}</div></div>` : ''}
       ${fakten ? `<div class="res-card"><div class="rc-row"><div class="rc-label">Wissenswertes</div></div><div class="facts-wrap">${fakten}</div></div>` : ''}
+    `;
+  }
+
+  // ── Reparatur-Ergebnis ───────────────────────────────────────
+  function renderRepair(data) {
+    if (!data.success) { showError(data.error); return; }
+    if (!data.gefunden) {
+      document.getElementById('resContent').innerHTML =
+        `<div class="msg-box info">🔧 Kein Schaden erkannt – näher ran halten oder Fehlermeldung sichtbar machen.</div>`; return;
+    }
+
+    const schwColors = { einfach: 'rgba(34,197,94,.15)', mittel: 'rgba(245,158,11,.15)', schwer: 'rgba(239,68,68,.15)' };
+    const schwIcons  = { einfach: '🟢', mittel: '🟡', schwer: '🔴' };
+    const schw = data.schwierigkeit || 'mittel';
+
+    const schritte = (data.schritte || []).map((s, i) => `
+      <div style="display:flex;gap:12px;padding:10px 0;border-bottom:1px solid var(--border)">
+        <div style="width:24px;height:24px;border-radius:50%;background:var(--accent);color:#fff;font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0">${i+1}</div>
+        <div style="font-size:14px;color:var(--text);line-height:1.5;padding-top:2px">${esc(s)}</div>
+      </div>`).join('');
+
+    const werkzeug = (data.werkzeug || []).map(w => `<div class="fact-chip">🔩 ${esc(w)}</div>`).join('');
+    const ursachen = (data.ursachen || []).map(u => `<div class="fact-chip">❓ ${esc(u)}</div>`).join('');
+
+    document.getElementById('resContent').innerHTML = `
+      <div class="res-card">
+        <div class="rc-row">
+          <div class="rc-text big">${esc(data.objekt)}</div>
+          <div style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap">
+            <span class="fact-chip" style="background:${schwColors[schw]}">${schwIcons[schw]} ${esc(schw)}</span>
+            <span class="fact-chip">💶 ${esc(data.kosten_schaetzung)}</span>
+            ${data.profi_noetig ? `<span class="fact-chip" style="background:rgba(239,68,68,.15);color:#fca5a5">👷 Profi empfohlen</span>` : ''}
+          </div>
+        </div>
+        <div class="rc-row">
+          <div class="rc-label">Erkanntes Problem</div>
+          <div class="rc-text body">${esc(data.problem)}</div>
+        </div>
+      </div>
+
+      ${data.sicherheitshinweis ? `
+      <div style="border-radius:14px;padding:14px 16px;margin-bottom:10px;background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.35)">
+        <div style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:#fca5a5;margin-bottom:6px">⚠️ Sicherheitshinweis</div>
+        <div style="font-size:14px;color:var(--text)">${esc(data.sicherheitshinweis)}</div>
+      </div>` : ''}
+
+      ${data.profi_noetig && data.profi_begruendung ? `
+      <div style="border-radius:14px;padding:14px 16px;margin-bottom:10px;background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.3)">
+        <div style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:#fbbf24;margin-bottom:6px">👷 Fachmann empfohlen</div>
+        <div style="font-size:14px;color:var(--text)">${esc(data.profi_begruendung)}</div>
+      </div>` : ''}
+
+      <div class="res-card">
+        <div class="rc-row"><div class="rc-label">Schritt-für-Schritt Anleitung</div></div>
+        <div style="padding:0 16px 4px">${schritte}</div>
+      </div>
+
+      ${werkzeug ? `<div class="res-card"><div class="rc-row"><div class="rc-label">Benötigtes Werkzeug</div></div><div class="facts-wrap">${werkzeug}</div></div>` : ''}
+      ${ursachen ? `<div class="res-card"><div class="rc-row"><div class="rc-label">Mögliche Ursachen</div></div><div class="facts-wrap">${ursachen}</div></div>` : ''}
     `;
   }
 
