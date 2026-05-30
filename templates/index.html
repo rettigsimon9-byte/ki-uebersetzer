@@ -3,499 +3,367 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <meta name="theme-color" content="#0a0a0f">
+  <meta name="theme-color" content="#000">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <title>KI Übersetzer</title>
-  <link rel="manifest" href="/manifest.json">
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
     :root {
-      --bg:       #0a0a0f;
-      --surface:  #12121a;
-      --card:     #1a1a26;
-      --border:   #2a2a3a;
-      --accent:   #6366f1;
-      --accent2:  #818cf8;
-      --success:  #22c55e;
-      --warn:     #f59e0b;
-      --text:     #e2e8f0;
-      --muted:    #64748b;
-      --radius:   16px;
+      --accent:  #6366f1;
+      --accent2: #818cf8;
+      --success: #22c55e;
+      --text:    #e2e8f0;
+      --muted:   #94a3b8;
+      --card-bg: rgba(10,10,20,.82);
+      --radius:  16px;
     }
 
     html, body {
-      height: 100%;
-      background: var(--bg);
+      height: 100%; width: 100%;
+      background: #000;
       color: var(--text);
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
       overflow: hidden;
     }
 
-    /* ── Layout ─────────────────────────────────────────────── */
-    .app {
-      display: flex;
-      flex-direction: column;
-      height: 100dvh;
-      height: 100vh;
-    }
-
-    /* ── Header ─────────────────────────────────────────────── */
-    .header {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: 12px 16px;
-      padding-top: max(12px, env(safe-area-inset-top));
-      background: var(--surface);
-      border-bottom: 1px solid var(--border);
-      flex-shrink: 0;
-      z-index: 10;
-    }
-    .header-title {
-      font-size: 17px;
-      font-weight: 700;
-      letter-spacing: -0.3px;
-    }
-    .header-title span { color: var(--accent2); }
-    .btn-icon {
-      background: var(--card);
-      border: 1px solid var(--border);
-      color: var(--text);
-      width: 36px; height: 36px;
-      border-radius: 10px;
-      display: flex; align-items: center; justify-content: center;
-      cursor: pointer;
-      font-size: 16px;
-      transition: background .15s;
-    }
-    .btn-icon:active { background: var(--border); }
-
-    /* ── Camera area ─────────────────────────────────────────── */
-    .camera-wrap {
-      position: relative;
-      flex: 1 1 0;
-      background: #000;
-      overflow: hidden;
-      min-height: 0;
-    }
+    /* ── Camera fullscreen ──────────────────────────────────── */
     #video {
+      position: fixed;
+      inset: 0;
       width: 100%; height: 100%;
       object-fit: cover;
-      display: block;
+      z-index: 1;
     }
     #canvas { display: none; }
 
     /* Corner guides */
     .guide {
-      position: absolute;
+      position: fixed;
       inset: 0;
+      z-index: 2;
       pointer-events: none;
     }
     .guide::before, .guide::after,
-    .guide .c1::before, .guide .c1::after,
-    .guide .c2::before, .guide .c2::after,
-    .guide .c3::before, .guide .c3::after {
+    .guide .c::before, .guide .c::after {
       content: '';
       position: absolute;
       width: 28px; height: 28px;
-      border-color: rgba(255,255,255,.7);
+      border-color: rgba(255,255,255,.65);
       border-style: solid;
     }
-    .guide::before  { top: 20px; left: 20px; border-width: 2px 0 0 2px; border-radius: 4px 0 0 0; }
-    .guide::after   { top: 20px; right: 20px; border-width: 2px 2px 0 0; border-radius: 0 4px 0 0; }
-    .guide .c1::before { bottom: 20px; left: 20px; border-width: 0 0 2px 2px; border-radius: 0 0 0 4px; }
-    .guide .c1::after  { bottom: 20px; right: 20px; border-width: 0 2px 2px 0; border-radius: 0 0 4px 0; }
+    .guide::before  { top: 60px; left: 20px; border-width: 2px 0 0 2px; border-radius: 4px 0 0 0; }
+    .guide::after   { top: 60px; right: 20px; border-width: 2px 2px 0 0; border-radius: 0 4px 0 0; }
+    .guide .c::before { bottom: 110px; left: 20px; border-width: 0 0 2px 2px; border-radius: 0 0 0 4px; }
+    .guide .c::after  { bottom: 110px; right: 20px; border-width: 0 2px 2px 0; border-radius: 0 0 4px 0; }
 
-    /* Flash overlay */
-    .flash-overlay {
-      position: absolute;
-      inset: 0;
-      background: #fff;
-      opacity: 0;
-      pointer-events: none;
-      transition: opacity .05s;
+    /* Flash */
+    .flash {
+      position: fixed; inset: 0; z-index: 50;
+      background: #fff; opacity: 0;
+      pointer-events: none; transition: opacity .05s;
     }
-    .flash-overlay.active { opacity: .6; }
+    .flash.on { opacity: .7; }
 
-    /* Scanning bar */
+    /* Scan bar */
     .scan-bar {
-      position: absolute;
-      left: 0; right: 0;
-      height: 2px;
+      position: fixed; left: 0; right: 0; height: 2px; z-index: 3;
       background: linear-gradient(90deg, transparent, var(--accent), transparent);
-      top: 0;
       display: none;
-      animation: scanMove 1.2s ease-in-out infinite;
+      animation: scan 1.2s ease-in-out infinite;
     }
-    @keyframes scanMove {
-      0%   { top: 5%; opacity: 1; }
-      50%  { top: 90%; opacity: .7; }
-      100% { top: 5%; opacity: 1; }
-    }
+    @keyframes scan { 0%,100% { top: 8%; } 50% { top: 88%; } }
     .scanning .scan-bar { display: block; }
 
     /* Camera error */
     .cam-error {
-      position: absolute;
-      inset: 0;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      gap: 12px;
-      padding: 32px;
-      text-align: center;
-      background: #000;
-      display: none;
+      position: fixed; inset: 0; z-index: 5;
+      display: none; flex-direction: column; align-items: center;
+      justify-content: center; gap: 12px; padding: 32px;
+      text-align: center; background: #000;
     }
     .cam-error.visible { display: flex; }
-    .cam-error-icon { font-size: 48px; }
-    .cam-error-text { color: var(--muted); font-size: 14px; line-height: 1.5; }
 
-    /* ── Fixed shutter bar ───────────────────────────────────── */
+    /* ── Shutter bar ─────────────────────────────────────────── */
     .shutter-bar {
       position: fixed;
       bottom: 0; left: 0; right: 0;
-      z-index: 100;
+      z-index: 10;
       display: flex;
       align-items: center;
       justify-content: center;
-      gap: 32px;
-      padding: 14px 24px;
-      padding-bottom: max(14px, env(safe-area-inset-bottom));
-      background: linear-gradient(to top, rgba(10,10,15,.95) 70%, transparent);
+      gap: 40px;
+      padding: 16px 32px;
+      padding-bottom: max(20px, env(safe-area-inset-bottom));
+      background: linear-gradient(to top, rgba(0,0,0,.7) 60%, transparent);
     }
     .btn-shutter {
-      width: 76px; height: 76px;
+      width: 72px; height: 72px;
       border-radius: 50%;
       background: #fff;
-      border: 4px solid rgba(255,255,255,.3);
+      border: 4px solid rgba(255,255,255,.4);
+      box-shadow: 0 0 0 3px var(--accent), 0 4px 24px rgba(0,0,0,.6);
       cursor: pointer;
+      font-size: 26px;
       display: flex; align-items: center; justify-content: center;
-      font-size: 28px;
-      box-shadow: 0 0 0 3px var(--accent), 0 4px 20px rgba(0,0,0,.5);
       transition: transform .1s;
       flex-shrink: 0;
     }
-    .btn-shutter:active { transform: scale(.9); }
-    .btn-shutter:disabled { opacity: .4; cursor: default; transform: none; }
-
-    .btn-flip {
+    .btn-shutter:active  { transform: scale(.88); }
+    .btn-shutter:disabled { opacity: .35; cursor: default; transform: none; }
+    .btn-round {
+      width: 48px; height: 48px; border-radius: 50%;
       background: rgba(255,255,255,.15);
       backdrop-filter: blur(8px);
       border: 1px solid rgba(255,255,255,.2);
-      color: #fff;
-      width: 50px; height: 50px;
-      border-radius: 50%;
+      color: #fff; font-size: 20px; cursor: pointer;
       display: flex; align-items: center; justify-content: center;
-      cursor: pointer;
-      font-size: 20px;
     }
-    .btn-flip:active { background: rgba(255,255,255,.3); }
+    .btn-round:active { background: rgba(255,255,255,.3); }
 
-    /* ── Bottom sheet (result) ────────────────────────────────── */
-    .bottom {
+    /* ── Result screen (fullscreen photo + overlay) ──────────── */
+    #resultScreen {
       display: none;
       position: fixed;
-      top: 0; bottom: 0; left: 0; right: 0;
-      z-index: 200;
-      background: var(--bg);
+      inset: 0; z-index: 100;
       flex-direction: column;
-      animation: slideUp .25s ease;
     }
-    .bottom.open { display: flex; }
-    @keyframes slideUp {
-      from { transform: translateY(100%); }
-      to   { transform: translateY(0); }
+    #resultScreen.open { display: flex; }
+
+    /* Photo background */
+    #resultPhoto {
+      position: absolute;
+      inset: 0;
+      width: 100%; height: 100%;
+      object-fit: cover;
     }
-    .sheet-handle {
+
+    /* Dark gradient at bottom for readability */
+    .photo-gradient {
+      position: absolute;
+      left: 0; right: 0; bottom: 0;
+      height: 70%;
+      background: linear-gradient(to top, rgba(0,0,0,.92) 40%, transparent);
+      pointer-events: none;
+    }
+
+    /* Top bar over photo */
+    .result-topbar {
+      position: relative; z-index: 2;
       display: flex;
       align-items: center;
       justify-content: space-between;
-      padding: 12px 16px 8px;
-      flex-shrink: 0;
+      padding: 12px 16px;
+      padding-top: max(12px, env(safe-area-inset-top));
     }
-    .sheet-drag {
-      width: 40px; height: 4px;
-      background: var(--border);
-      border-radius: 2px;
-      margin: 0 auto;
-    }
-    .btn-close-sheet {
-      background: var(--card);
-      border: 1px solid var(--border);
-      color: var(--muted);
-      width: 30px; height: 30px;
-      border-radius: 50%;
-      display: flex; align-items: center; justify-content: center;
-      cursor: pointer;
+    .btn-back {
+      background: rgba(0,0,0,.5);
+      backdrop-filter: blur(10px);
+      border: 1px solid rgba(255,255,255,.15);
+      color: #fff;
+      padding: 8px 16px;
+      border-radius: 20px;
       font-size: 14px;
-      flex-shrink: 0;
+      font-weight: 600;
+      cursor: pointer;
+      display: flex; align-items: center; gap: 6px;
+    }
+    .btn-back:active { background: rgba(0,0,0,.7); }
+    .lang-badge {
+      background: rgba(99,102,241,.25);
+      backdrop-filter: blur(8px);
+      border: 1px solid rgba(99,102,241,.4);
+      color: var(--accent2);
+      font-size: 11px; font-weight: 700;
+      text-transform: uppercase; letter-spacing: .5px;
+      padding: 5px 12px; border-radius: 20px;
     }
 
-    /* Result card */
-    .result-area {
-      overflow-y: auto;
+    /* Spacer pushes content down */
+    .result-spacer { flex: 1; position: relative; z-index: 2; }
+
+    /* Translation box at bottom */
+    .translation-box {
+      position: relative; z-index: 2;
       padding: 0 16px;
       padding-bottom: max(24px, env(safe-area-inset-bottom));
-      flex: 1 1 0;
-      min-height: 0;
     }
-
-    .result-card {
-      background: var(--card);
-      border: 1px solid var(--border);
+    .translation-card {
+      background: var(--card-bg);
+      backdrop-filter: blur(16px);
+      border: 1px solid rgba(255,255,255,.1);
       border-radius: var(--radius);
       overflow: hidden;
     }
-
-    .result-placeholder {
-      padding: 20px;
-      text-align: center;
-      color: var(--muted);
-      font-size: 14px;
-    }
-
-    .result-lang-badge {
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      background: rgba(99,102,241,.15);
-      color: var(--accent2);
-      font-size: 11px;
-      font-weight: 600;
-      text-transform: uppercase;
-      letter-spacing: .5px;
-      padding: 4px 10px;
-      border-radius: 20px;
-    }
-
-    .result-section {
+    .tr-section {
       padding: 14px 16px;
     }
-    .result-section + .result-section {
-      border-top: 1px solid var(--border);
+    .tr-section + .tr-section {
+      border-top: 1px solid rgba(255,255,255,.08);
     }
-    .result-label {
-      font-size: 10px;
-      font-weight: 600;
-      text-transform: uppercase;
-      letter-spacing: .8px;
-      color: var(--muted);
-      margin-bottom: 6px;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
+    .tr-label {
+      font-size: 10px; font-weight: 700;
+      text-transform: uppercase; letter-spacing: .8px;
+      color: var(--muted); margin-bottom: 6px;
+      display: flex; align-items: center; justify-content: space-between;
     }
-    .result-text {
-      font-size: 15px;
-      line-height: 1.55;
-      white-space: pre-wrap;
-      word-break: break-word;
+    .tr-text {
+      font-size: 16px; line-height: 1.5;
+      white-space: pre-wrap; word-break: break-word;
+      color: #fff; font-weight: 500;
     }
-    .result-text.translation {
-      color: #a5b4fc;
-      font-weight: 500;
+    .tr-orig {
+      font-size: 13px; line-height: 1.45;
+      color: var(--muted); white-space: pre-wrap; word-break: break-word;
     }
-
     .btn-copy {
-      background: none;
-      border: 1px solid var(--border);
+      background: rgba(255,255,255,.08);
+      border: 1px solid rgba(255,255,255,.15);
       color: var(--muted);
-      font-size: 11px;
-      padding: 3px 8px;
-      border-radius: 6px;
-      cursor: pointer;
-      transition: color .15s, border-color .15s;
+      font-size: 11px; padding: 3px 10px;
+      border-radius: 6px; cursor: pointer;
     }
-    .btn-copy:active, .btn-copy.copied {
-      color: var(--success);
-      border-color: var(--success);
-    }
+    .btn-copy.ok { color: var(--success); border-color: var(--success); }
 
-    /* Loading state */
-    .loading-card {
-      background: var(--card);
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
-      padding: 24px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 12px;
-      font-size: 14px;
-      color: var(--muted);
+    /* Loading overlay over photo */
+    .loading-overlay {
+      position: absolute; inset: 0; z-index: 3;
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center; gap: 14px;
+      background: rgba(0,0,0,.45);
+      backdrop-filter: blur(2px);
     }
     .spinner {
-      width: 20px; height: 20px;
-      border: 2px solid var(--border);
-      border-top-color: var(--accent);
+      width: 44px; height: 44px;
+      border: 3px solid rgba(255,255,255,.2);
+      border-top-color: var(--accent2);
       border-radius: 50%;
-      animation: spin .7s linear infinite;
+      animation: spin .8s linear infinite;
     }
     @keyframes spin { to { transform: rotate(360deg); } }
+    .loading-label { font-size: 14px; color: #fff; font-weight: 500; }
 
-    /* Error */
-    .error-card {
-      background: rgba(239,68,68,.08);
+    /* Error inside result screen */
+    .error-box {
+      background: rgba(239,68,68,.15);
       border: 1px solid rgba(239,68,68,.3);
       border-radius: var(--radius);
-      padding: 14px 16px;
-      font-size: 13px;
-      color: #fca5a5;
-      display: flex;
-      gap: 8px;
-      align-items: flex-start;
+      padding: 16px;
+      font-size: 14px; color: #fca5a5;
     }
 
-    /* History pill */
-    .history-toggle {
-      background: none;
-      border: none;
-      color: var(--muted);
-      font-size: 12px;
-      cursor: pointer;
-      padding: 4px 0;
-      display: flex;
-      align-items: center;
-      gap: 4px;
-      width: 100%;
-      justify-content: center;
-      margin-top: 8px;
+    /* No-text box */
+    .notext-box {
+      background: var(--card-bg);
+      backdrop-filter: blur(16px);
+      border: 1px solid rgba(255,255,255,.1);
+      border-radius: var(--radius);
+      padding: 20px; text-align: center;
+      font-size: 14px; color: var(--muted);
     }
-
-    .history-list {
-      display: none;
-      flex-direction: column;
-      gap: 8px;
-      margin-top: 8px;
-    }
-    .history-list.open { display: flex; }
-
-    .history-item {
-      background: var(--card);
-      border: 1px solid var(--border);
-      border-radius: 12px;
-      padding: 10px 14px;
-      font-size: 12px;
-    }
-    .history-item .hi-lang { color: var(--muted); font-size: 10px; margin-bottom: 4px; }
-    .history-item .hi-tr   { color: var(--accent2); line-height: 1.4; }
-    .history-item .hi-orig { color: var(--muted); margin-top: 2px; font-style: italic; line-height: 1.3; }
   </style>
 </head>
 <body>
 
-<div class="app">
+<!-- Live camera -->
+<video id="video" autoplay playsinline muted></video>
+<canvas id="canvas"></canvas>
+<div class="guide"><div class="c"></div></div>
+<div class="scan-bar" id="scanBar"></div>
+<div class="flash" id="flash"></div>
 
-  <!-- Header -->
-  <header class="header">
-    <div class="header-title">KI <span>Übersetzer</span></div>
-    <div style="display:flex;gap:8px">
-      <button class="btn-icon" id="btnHistory" title="Verlauf" onclick="toggleHistory()">🕐</button>
-    </div>
-  </header>
+<div class="cam-error" id="camError">
+  <div style="font-size:48px">📷</div>
+  <div style="font-size:16px;font-weight:600">Kamera nicht verfügbar</div>
+  <div style="color:var(--muted);font-size:14px;line-height:1.5">
+    Bitte erlaube den Kamera-Zugriff.<br><br>
+    iPhone: Einstellungen → Safari → Kamera → Erlauben
+  </div>
+  <button onclick="startCamera()" style="margin-top:8px;background:var(--accent);color:#fff;border:none;padding:10px 20px;border-radius:10px;font-size:14px;cursor:pointer">
+    Nochmal versuchen
+  </button>
+</div>
 
-  <!-- Camera -->
-  <div class="camera-wrap" id="cameraWrap">
-    <video id="video" autoplay playsinline muted></video>
-    <canvas id="canvas"></canvas>
-    <div class="guide"><div class="c1"></div></div>
-    <div class="scan-bar"></div>
-    <div class="flash-overlay" id="flashOverlay"></div>
-    <div class="cam-error" id="camError">
-      <div class="cam-error-icon">📷</div>
-      <div style="font-size:16px;font-weight:600">Kamera nicht verfügbar</div>
-      <div class="cam-error-text">
-        Bitte erlaube den Kamera-Zugriff in den Browser-Einstellungen und lade die Seite neu.
-        <br><br>
-        Auf dem iPhone: Einstellungen → Safari → Kamera → Erlauben
-      </div>
-      <button onclick="startCamera()" style="margin-top:8px;background:var(--accent);color:#fff;border:none;padding:10px 20px;border-radius:10px;font-size:14px;cursor:pointer">
-        Nochmal versuchen
-      </button>
-    </div>
+<!-- Shutter bar -->
+<div class="shutter-bar">
+  <button class="btn-round" onclick="flipCamera()">🔄</button>
+  <button class="btn-shutter" id="btnCapture" onclick="capture()">📸</button>
+  <div style="width:48px"></div>
+</div>
+
+<!-- Result screen (fullscreen) -->
+<div id="resultScreen">
+  <img id="resultPhoto" src="" alt="">
+  <div class="photo-gradient"></div>
+  <div id="loadingOverlay" class="loading-overlay" style="display:none">
+    <div class="spinner"></div>
+    <div class="loading-label">KI übersetzt…</div>
   </div>
 
-  <!-- Fixed shutter bar – always visible -->
-  <div class="shutter-bar">
-    <button class="btn-flip" id="btnFlip" onclick="flipCamera()" title="Kamera wechseln">🔄</button>
-    <button class="btn-shutter" id="btnCapture" onclick="capture()">📸</button>
-    <div style="width:50px"></div>
+  <div class="result-topbar">
+    <button class="btn-back" onclick="closeResult()">← Kamera</button>
+    <div class="lang-badge" id="langBadge" style="display:none"></div>
   </div>
 
-  <!-- Bottom sheet – slides up with result -->
-  <div class="bottom" id="bottomSheet">
-    <div class="sheet-handle">
-      <div style="width:30px"></div>
-      <div class="sheet-drag"></div>
-      <button class="btn-close-sheet" onclick="closeSheet()">✕</button>
-    </div>
-    <div class="result-area" id="resultArea">
-      <div class="history-list" id="historyList"></div>
-    </div>
-  </div>
+  <div class="result-spacer"></div>
 
+  <div class="translation-box" id="translationBox"></div>
 </div>
 
 <script>
   let stream = null;
   let facingMode = 'environment';
-  let history = [];
-  let histOpen = false;
 
-  // ── Camera ─────────────────────────────────────────────────
+  // ── Camera ──────────────────────────────────────────────────
   async function startCamera() {
     document.getElementById('camError').classList.remove('visible');
-    const constraints = {
-      video: {
-        facingMode: { ideal: facingMode },
-        width: { ideal: 1920 },
-        height: { ideal: 1080 },
-      },
-      audio: false,
-    };
     try {
-      if (stream) { stream.getTracks().forEach(t => t.stop()); }
-      stream = await navigator.mediaDevices.getUserMedia(constraints);
+      if (stream) stream.getTracks().forEach(t => t.stop());
+      stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: { ideal: facingMode }, width: { ideal: 1920 } },
+        audio: false,
+      });
       document.getElementById('video').srcObject = stream;
-    } catch (err) {
-      console.error('Camera error:', err);
+    } catch (e) {
       document.getElementById('camError').classList.add('visible');
     }
   }
 
-  async function flipCamera() {
+  function flipCamera() {
     facingMode = facingMode === 'environment' ? 'user' : 'environment';
-    await startCamera();
+    startCamera();
   }
 
-  // ── Capture & Translate ─────────────────────────────────────
+  // ── Capture ─────────────────────────────────────────────────
   async function capture() {
-    const video   = document.getElementById('video');
-    const canvas  = document.getElementById('canvas');
-    const btn     = document.getElementById('btnCapture');
-    const wrap    = document.getElementById('cameraWrap');
-    const flash   = document.getElementById('flashOverlay');
-
-    if (!stream) { alert('Kamera nicht verfügbar.'); return; }
+    const video = document.getElementById('video');
+    const canvas = document.getElementById('canvas');
+    const btn = document.getElementById('btnCapture');
+    if (!stream) return;
 
     // Flash
-    flash.classList.add('active');
-    setTimeout(() => flash.classList.remove('active'), 120);
+    const fl = document.getElementById('flash');
+    fl.classList.add('on');
+    setTimeout(() => fl.classList.remove('on'), 120);
 
-    // Capture frame
+    // Draw frame
     canvas.width  = video.videoWidth  || 640;
     canvas.height = video.videoHeight || 480;
-    canvas.getContext('2d').drawImage(video, 0, 0, canvas.width, canvas.height);
-    const imageData = canvas.toDataURL('image/jpeg', 0.85);
+    canvas.getContext('2d').drawImage(video, 0, 0);
 
-    // UI: loading
+    // Resize to max 1100px to speed up API
+    const imageData = resizeCanvas(canvas, 1100);
+
+    // Show result screen with photo + loading
+    document.getElementById('resultPhoto').src = imageData;
+    document.getElementById('langBadge').style.display = 'none';
+    document.getElementById('translationBox').innerHTML = '';
+    document.getElementById('loadingOverlay').style.display = 'flex';
+    document.getElementById('resultScreen').classList.add('open');
+
     btn.disabled = true;
-    wrap.classList.add('scanning');
-    showLoading();
+    document.getElementById('scanBar').style.display = 'block';
 
     try {
       const res  = await fetch('/api/translate', {
@@ -504,139 +372,79 @@
         body: JSON.stringify({ image: imageData }),
       });
       const data = await res.json();
-
-      if (!data.success) {
-        showError(data.error || 'Unbekannter Fehler');
-      } else if (data.kein_text) {
-        showNoText();
-      } else {
-        showResult(data);
-        addToHistory(data);
-      }
-    } catch (err) {
-      showError('Netzwerkfehler: ' + err.message);
+      showResult(data);
+    } catch (e) {
+      showError('Netzwerkfehler: ' + e.message);
     } finally {
       btn.disabled = false;
-      wrap.classList.remove('scanning');
+      document.getElementById('scanBar').style.display = 'none';
+      document.getElementById('loadingOverlay').style.display = 'none';
     }
   }
 
-  // ── Sheet open/close ────────────────────────────────────────
-  function openSheet() {
-    document.getElementById('bottomSheet').classList.add('open');
-  }
-  function closeSheet() {
-    document.getElementById('bottomSheet').classList.remove('open');
+  function resizeCanvas(canvas, maxW) {
+    if (canvas.width <= maxW) return canvas.toDataURL('image/jpeg', 0.82);
+    const scale = maxW / canvas.width;
+    const tmp = document.createElement('canvas');
+    tmp.width  = maxW;
+    tmp.height = Math.round(canvas.height * scale);
+    tmp.getContext('2d').drawImage(canvas, 0, 0, tmp.width, tmp.height);
+    return tmp.toDataURL('image/jpeg', 0.82);
   }
 
-  // ── Result rendering ────────────────────────────────────────
-  function showLoading() {
-    openSheet();
-    document.getElementById('resultArea').innerHTML = `
-      <div class="loading-card">
-        <div class="spinner"></div>
-        KI analysiert Bild…
-      </div>
-    `;
+  // ── Result rendering ─────────────────────────────────────────
+  function showResult(data) {
+    if (!data.success) { showError(data.error || 'Fehler'); return; }
+
+    if (data.kein_text) {
+      document.getElementById('translationBox').innerHTML =
+        `<div class="notext-box">🔍 Kein Text erkannt – näher ran halten</div>`;
+      return;
+    }
+
+    const badge = document.getElementById('langBadge');
+    badge.textContent = `🌍 ${esc(data.erkannte_sprache || '?')} → Deutsch`;
+    badge.style.display = '';
+
+    document.getElementById('translationBox').innerHTML = `
+      <div class="translation-card">
+        <div class="tr-section">
+          <div class="tr-label">
+            Deutsche Übersetzung
+            <button class="btn-copy" id="copyBtn" onclick="copyText(this, ${JSON.stringify(data.uebersetzung)})">Kopieren</button>
+          </div>
+          <div class="tr-text">${esc(data.uebersetzung)}</div>
+        </div>
+        <div class="tr-section">
+          <div class="tr-label">Original</div>
+          <div class="tr-orig">${esc(data.original)}</div>
+        </div>
+      </div>`;
   }
 
   function showError(msg) {
-    openSheet();
-    document.getElementById('resultArea').innerHTML = `
-      <div class="error-card">⚠️ <span>${escHtml(msg)}</span></div>
-    `;
+    document.getElementById('translationBox').innerHTML =
+      `<div class="error-box">⚠️ ${esc(msg)}</div>`;
   }
 
-  function showNoText() {
-    openSheet();
-    document.getElementById('resultArea').innerHTML = `
-      <div class="result-card">
-        <div class="result-placeholder">🔍 Kein Text erkannt — halte die Kamera näher ans Dokument</div>
-      </div>
-    `;
+  function closeResult() {
+    document.getElementById('resultScreen').classList.remove('open');
   }
 
-  function showResult(data) {
-    openSheet();
-    document.getElementById('resultArea').innerHTML = `
-      <div class="result-card">
-        <div class="result-section" style="padding-bottom:10px">
-          <span class="result-lang-badge">🌍 ${escHtml(data.erkannte_sprache || 'Unbekannt')} → Deutsch</span>
-        </div>
-        <div class="result-section">
-          <div class="result-label">
-            Deutsche Übersetzung
-            <button class="btn-copy" onclick="copyText(this, ${JSON.stringify(data.uebersetzung)})">Kopieren</button>
-          </div>
-          <div class="result-text translation">${escHtml(data.uebersetzung)}</div>
-        </div>
-        <div class="result-section">
-          <div class="result-label">Original</div>
-          <div class="result-text" style="color:var(--muted);font-size:13px">${escHtml(data.original)}</div>
-        </div>
-      </div>
-      ${renderHistoryToggle()}
-    `;
-    renderHistoryItems();
-  }
-
-  // ── History ─────────────────────────────────────────────────
-  function addToHistory(data) {
-    history.unshift(data);
-    if (history.length > 20) history.pop();
-  }
-
-  function renderHistoryToggle() {
-    if (history.length === 0) return '';
-    return `
-      <button class="history-toggle" id="historyToggle" onclick="toggleHistory()">
-        <span id="histArrow">${histOpen ? '▴' : '▾'}</span> Verlauf (${history.length})
-      </button>
-      <div class="history-list ${histOpen ? 'open' : ''}" id="historyList"></div>
-    `;
-  }
-
-  function toggleHistory() {
-    histOpen = !histOpen;
-    const list  = document.getElementById('historyList');
-    const arrow = document.getElementById('histArrow');
-    if (!list) return;
-    list.classList.toggle('open', histOpen);
-    if (arrow) arrow.textContent = histOpen ? '▴' : '▾';
-    if (histOpen) renderHistoryItems();
-  }
-
-  function renderHistoryItems() {
-    const list = document.getElementById('historyList');
-    if (!list) return;
-    list.innerHTML = history.slice(1).map(d => `
-      <div class="history-item">
-        <div class="hi-lang">${escHtml(d.erkannte_sprache || '?')} → Deutsch</div>
-        <div class="hi-tr">${escHtml(d.uebersetzung)}</div>
-        <div class="hi-orig">${escHtml(truncate(d.original, 80))}</div>
-      </div>
-    `).join('');
-  }
-
-  // ── Helpers ─────────────────────────────────────────────────
+  // ── Helpers ──────────────────────────────────────────────────
   async function copyText(btn, text) {
     try {
       await navigator.clipboard.writeText(text);
       btn.textContent = 'Kopiert ✓';
-      btn.classList.add('copied');
-      setTimeout(() => { btn.textContent = 'Kopieren'; btn.classList.remove('copied'); }, 2000);
+      btn.classList.add('ok');
+      setTimeout(() => { btn.textContent = 'Kopieren'; btn.classList.remove('ok'); }, 2000);
     } catch {}
   }
 
-  function escHtml(str) {
-    return String(str ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  function esc(s) {
+    return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
   }
 
-  function truncate(str, n) {
-    return str && str.length > n ? str.slice(0, n) + '…' : (str || '');
-  }
-
-  // ── Init ─────────────────────────────────────────────────────
   startCamera();
 </script>
 </body>
