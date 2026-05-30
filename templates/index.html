@@ -376,6 +376,17 @@
     </button>
   </div>
 
+  <!-- Hinweis-Feld direkt auf Kamera-Screen -->
+  <div style="position:absolute;bottom:120px;left:14px;right:14px;z-index:10">
+    <input id="hinweisInput" type="text" inputmode="text" autocomplete="off" autocorrect="off"
+      placeholder="Hinweis (optional): z.B. Griff klemmt…"
+      style="width:100%;background:rgba(0,0,0,.55);backdrop-filter:blur(10px);
+             -webkit-backdrop-filter:blur(10px);border:1px solid rgba(255,255,255,.25);
+             color:#fff;padding:12px 16px;border-radius:14px;font-size:16px;
+             font-family:inherit;outline:none;-webkit-appearance:none;appearance:none;
+             box-sizing:border-box">
+  </div>
+
   <div class="shutter-bar">
     <button class="btn-round" onclick="flipCamera()">🔄</button>
     <button class="btn-shutter" id="btnCapture" onclick="capture()">📸</button>
@@ -401,35 +412,6 @@
   <div class="res-content" id="resContent"></div>
 </div>
 
-<!-- Input-Overlay: position:fixed, AUSSERHALB jedes Scroll-Containers -->
-<div id="inputOverlay" style="
-  display:none; position:fixed; bottom:0; left:0; right:0; z-index:999;
-  background:var(--surface); border-top:2px solid var(--accent);
-  padding:14px 14px; padding-bottom:max(16px, env(safe-area-inset-bottom));
-  box-shadow: 0 -4px 24px rgba(0,0,0,.5);">
-  <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:var(--muted);margin-bottom:10px">
-    Zusätzliche Infos <span style="font-weight:400;text-transform:none;letter-spacing:0">(optional – z.B. "Griff klemmt")</span>
-  </div>
-  <div style="display:flex; gap:8px">
-    <input id="hinweisInput" type="text" inputmode="text" autocomplete="off"
-      placeholder='Details zum Problem…'
-      style="flex:1; min-width:0; background:var(--card); border:1px solid var(--border);
-             color:var(--text); padding:12px 14px; border-radius:12px;
-             font-size:16px; font-family:inherit; outline:none;
-             -webkit-appearance:none; appearance:none;">
-    <button onclick="startAnalyse()" style="
-      background:var(--accent); color:#fff; border:none;
-      padding:12px 18px; border-radius:12px;
-      font-size:15px; font-weight:700; cursor:pointer; flex-shrink:0">
-      →
-    </button>
-  </div>
-  <button onclick="startAnalyse()" style="
-    width:100%; margin-top:10px; background:var(--accent); color:#fff; border:none;
-    padding:13px; border-radius:12px; font-size:15px; font-weight:700; cursor:pointer">
-    Analysieren
-  </button>
-</div>
 
 <script>
   let stream = null, facingMode = 'environment', currentMode = 'translate';
@@ -461,10 +443,7 @@
     showScreen('dashboard');
   }
 
-  function backToCamera() {
-    document.getElementById('inputOverlay').style.display = 'none';
-    showScreen('cameraScreen');
-  }
+  function backToCamera() { showScreen('cameraScreen'); }
 
   // ── Kamera ───────────────────────────────────────────────────
   async function startCamera() {
@@ -500,33 +479,25 @@
     canvas.getContext('2d').drawImage(video, 0, 0);
     capturedImage = resizeCanvas(canvas, 1100);
 
-    // Ergebnis-Screen zeigen + Input-Overlay öffnen
+    // Hinweis auslesen und Feld leeren
+    const beschreibung = document.getElementById('hinweisInput').value.trim();
+    document.getElementById('hinweisInput').value = '';
+    document.getElementById('hinweisInput').blur();
+
+    // Ergebnis-Screen sofort mit Spinner zeigen
     const m = MODES[currentMode];
     document.getElementById('resPill').textContent = m.pill;
     document.getElementById('resultPhoto').src = capturedImage;
-    document.getElementById('hinweisInput').value = '';
-    document.getElementById('resContent').innerHTML = '';
-    document.getElementById('photoDivider').style.display = 'none';
-    document.getElementById('inputOverlay').style.display = 'block';
+    document.getElementById('resContent').innerHTML =
+      `<div class="loading-wrap"><div class="spinner"></div><div style="color:var(--muted);font-size:14px">KI analysiert…</div></div>`;
+    document.getElementById('photoDivider').style.display = 'flex';
 
     const rs = document.getElementById('resultScreen');
     rs.classList.add('active');
     document.getElementById('cameraScreen').classList.remove('active');
     rs.scrollTop = 0;
 
-  }
-
-  async function startAnalyse() {
-    if (!capturedImage) return;
-    const m = MODES[currentMode];
-    const beschreibung = document.getElementById('hinweisInput').value.trim();
-
-    // Overlay ausblenden, Divider + Spinner einblenden
-    document.getElementById('inputOverlay').style.display = 'none';
-    document.getElementById('photoDivider').style.display = 'flex';
-    document.getElementById('resContent').innerHTML =
-      `<div class="loading-wrap"><div class="spinner"></div><div style="color:var(--muted);font-size:14px">KI analysiert…</div></div>`;
-
+    btn.disabled = true;
     document.getElementById('scanLine').style.display = 'block';
 
     try {
@@ -543,6 +514,7 @@
       document.getElementById('resContent').innerHTML =
         `<div class="msg-box error">⚠️ Netzwerkfehler: ${esc(e.message)}</div>`;
     } finally {
+      btn.disabled = false;
       document.getElementById('scanLine').style.display = 'none';
     }
   }
