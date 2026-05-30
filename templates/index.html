@@ -9,315 +9,299 @@
   <title>KI Übersetzer</title>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-
     :root {
       --accent:  #6366f1;
       --accent2: #818cf8;
-      --success: #22c55e;
+      --bg:      #0a0a0f;
+      --card:    #16161f;
+      --border:  #2a2a3a;
       --text:    #e2e8f0;
-      --muted:   #94a3b8;
-      --card-bg: rgba(10,10,20,.82);
-      --radius:  16px;
+      --muted:   #64748b;
+      --success: #22c55e;
     }
 
     html, body {
-      height: 100%; width: 100%;
-      background: #000;
+      height: 100%; background: #000;
       color: var(--text);
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
       overflow: hidden;
     }
 
-    /* ── Camera fullscreen ──────────────────────────────────── */
+    /* ═══ CAMERA SCREEN ══════════════════════════════════════ */
+    #cameraScreen {
+      position: fixed; inset: 0; z-index: 1;
+    }
     #video {
-      position: fixed;
-      inset: 0;
       width: 100%; height: 100%;
-      object-fit: cover;
-      z-index: 1;
+      object-fit: cover; display: block;
     }
     #canvas { display: none; }
 
-    /* Corner guides */
     .guide {
-      position: fixed;
-      inset: 0;
-      z-index: 2;
-      pointer-events: none;
+      position: absolute; inset: 0; pointer-events: none;
     }
     .guide::before, .guide::after,
     .guide .c::before, .guide .c::after {
-      content: '';
-      position: absolute;
+      content: ''; position: absolute;
       width: 28px; height: 28px;
-      border-color: rgba(255,255,255,.65);
-      border-style: solid;
+      border-color: rgba(255,255,255,.6); border-style: solid;
     }
-    .guide::before  { top: 60px; left: 20px; border-width: 2px 0 0 2px; border-radius: 4px 0 0 0; }
-    .guide::after   { top: 60px; right: 20px; border-width: 2px 2px 0 0; border-radius: 0 4px 0 0; }
-    .guide .c::before { bottom: 110px; left: 20px; border-width: 0 0 2px 2px; border-radius: 0 0 0 4px; }
-    .guide .c::after  { bottom: 110px; right: 20px; border-width: 0 2px 2px 0; border-radius: 0 0 4px 0; }
+    .guide::before  { top: 60px; left: 20px; border-width: 2px 0 0 2px; border-radius: 3px 0 0 0; }
+    .guide::after   { top: 60px; right: 20px; border-width: 2px 2px 0 0; border-radius: 0 3px 0 0; }
+    .guide .c::before { bottom: 120px; left: 20px; border-width: 0 0 2px 2px; border-radius: 0 0 0 3px; }
+    .guide .c::after  { bottom: 120px; right: 20px; border-width: 0 2px 2px 0; border-radius: 0 0 3px 0; }
 
-    /* Flash */
-    .flash {
-      position: fixed; inset: 0; z-index: 50;
-      background: #fff; opacity: 0;
-      pointer-events: none; transition: opacity .05s;
+    .flash { position: absolute; inset: 0; background: #fff; opacity: 0; pointer-events: none; transition: opacity .05s; }
+    .flash.on { opacity: .65; }
+
+    .scan-line {
+      position: absolute; left: 0; right: 0; height: 2px;
+      background: linear-gradient(90deg, transparent, var(--accent2), transparent);
+      display: none; animation: scanAnim 1.3s ease-in-out infinite;
     }
-    .flash.on { opacity: .7; }
+    @keyframes scanAnim { 0%,100% { top: 8%; } 50% { top: 86%; } }
+    .scanning .scan-line { display: block; }
 
-    /* Scan bar */
-    .scan-bar {
-      position: fixed; left: 0; right: 0; height: 2px; z-index: 3;
-      background: linear-gradient(90deg, transparent, var(--accent), transparent);
-      display: none;
-      animation: scan 1.2s ease-in-out infinite;
-    }
-    @keyframes scan { 0%,100% { top: 8%; } 50% { top: 88%; } }
-    .scanning .scan-bar { display: block; }
-
-    /* Camera error */
-    .cam-error {
-      position: fixed; inset: 0; z-index: 5;
-      display: none; flex-direction: column; align-items: center;
-      justify-content: center; gap: 12px; padding: 32px;
-      text-align: center; background: #000;
-    }
-    .cam-error.visible { display: flex; }
-
-    /* ── Shutter bar ─────────────────────────────────────────── */
+    /* Shutter bar */
     .shutter-bar {
-      position: fixed;
-      bottom: 0; left: 0; right: 0;
-      z-index: 10;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 40px;
-      padding: 16px 32px;
-      padding-bottom: max(20px, env(safe-area-inset-bottom));
-      background: linear-gradient(to top, rgba(0,0,0,.7) 60%, transparent);
+      position: absolute; bottom: 0; left: 0; right: 0;
+      display: flex; align-items: center; justify-content: center; gap: 40px;
+      padding: 18px 32px;
+      padding-bottom: max(22px, env(safe-area-inset-bottom));
+      background: linear-gradient(to top, rgba(0,0,0,.75) 55%, transparent);
     }
     .btn-shutter {
-      width: 72px; height: 72px;
-      border-radius: 50%;
-      background: #fff;
-      border: 4px solid rgba(255,255,255,.4);
-      box-shadow: 0 0 0 3px var(--accent), 0 4px 24px rgba(0,0,0,.6);
-      cursor: pointer;
-      font-size: 26px;
+      width: 74px; height: 74px; border-radius: 50%;
+      background: #fff; border: 4px solid rgba(255,255,255,.35);
+      box-shadow: 0 0 0 3px var(--accent), 0 6px 28px rgba(0,0,0,.55);
+      cursor: pointer; font-size: 26px;
       display: flex; align-items: center; justify-content: center;
-      transition: transform .1s;
-      flex-shrink: 0;
+      transition: transform .1s; flex-shrink: 0;
     }
     .btn-shutter:active  { transform: scale(.88); }
     .btn-shutter:disabled { opacity: .35; cursor: default; transform: none; }
     .btn-round {
-      width: 48px; height: 48px; border-radius: 50%;
-      background: rgba(255,255,255,.15);
-      backdrop-filter: blur(8px);
+      width: 50px; height: 50px; border-radius: 50%;
+      background: rgba(255,255,255,.15); backdrop-filter: blur(8px);
       border: 1px solid rgba(255,255,255,.2);
       color: #fff; font-size: 20px; cursor: pointer;
       display: flex; align-items: center; justify-content: center;
     }
     .btn-round:active { background: rgba(255,255,255,.3); }
 
-    /* ── Result screen (fullscreen photo + overlay) ──────────── */
+    /* Camera error */
+    .cam-error {
+      position: absolute; inset: 0; display: none;
+      flex-direction: column; align-items: center; justify-content: center;
+      gap: 12px; padding: 32px; text-align: center; background: #000;
+    }
+    .cam-error.on { display: flex; }
+
+    /* ═══ RESULT SCREEN ══════════════════════════════════════ */
     #resultScreen {
+      position: fixed; inset: 0; z-index: 200;
       display: none;
-      position: fixed;
-      inset: 0; z-index: 100;
       flex-direction: column;
+      background: var(--bg);
+      /* Full-screen scrollable container */
+      overflow-y: scroll;
+      -webkit-overflow-scrolling: touch;
+      overscroll-behavior: contain;
+      animation: slideUp .22s ease;
     }
     #resultScreen.open { display: flex; }
+    @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
 
-    /* Photo background */
-    #resultPhoto {
-      position: absolute;
-      inset: 0;
-      width: 100%; height: 100%;
-      object-fit: cover;
-    }
-
-    /* Dark gradient at bottom for readability */
-    .photo-gradient {
-      position: absolute;
-      left: 0; right: 0; bottom: 0;
-      height: 70%;
-      background: linear-gradient(to top, rgba(0,0,0,.92) 40%, transparent);
-      pointer-events: none;
-    }
-
-    /* Top bar over photo */
+    /* Sticky top bar inside result */
     .result-topbar {
-      position: relative; z-index: 2;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: 12px 16px;
-      padding-top: max(12px, env(safe-area-inset-top));
+      position: sticky; top: 0; z-index: 10;
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 10px 14px;
+      padding-top: max(10px, env(safe-area-inset-top));
+      background: rgba(10,10,15,.92);
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
     }
     .btn-back {
-      background: rgba(0,0,0,.5);
-      backdrop-filter: blur(10px);
-      border: 1px solid rgba(255,255,255,.15);
-      color: #fff;
-      padding: 8px 16px;
-      border-radius: 20px;
-      font-size: 14px;
-      font-weight: 600;
-      cursor: pointer;
-      display: flex; align-items: center; gap: 6px;
+      background: var(--card);
+      border: 1px solid var(--border);
+      color: var(--text); padding: 7px 14px;
+      border-radius: 20px; font-size: 14px; font-weight: 600;
+      cursor: pointer; display: flex; align-items: center; gap: 5px;
     }
-    .btn-back:active { background: rgba(0,0,0,.7); }
-    .lang-badge {
-      background: rgba(99,102,241,.25);
-      backdrop-filter: blur(8px);
-      border: 1px solid rgba(99,102,241,.4);
-      color: var(--accent2);
-      font-size: 11px; font-weight: 700;
+    .btn-back:active { background: var(--border); }
+    .lang-pill {
+      background: rgba(99,102,241,.18);
+      border: 1px solid rgba(99,102,241,.35);
+      color: var(--accent2); font-size: 11px; font-weight: 700;
       text-transform: uppercase; letter-spacing: .5px;
       padding: 5px 12px; border-radius: 20px;
     }
 
-    /* Spacer pushes content down */
-    .result-spacer { flex: 1; position: relative; z-index: 2; }
+    /* Photo section */
+    .photo-wrap {
+      width: 100%; flex-shrink: 0;
+      position: relative; background: #000;
+    }
+    #resultPhoto {
+      width: 100%; display: block;
+      max-height: 52vh; object-fit: contain;
+    }
+    /* "Original text" label over photo */
+    .photo-label {
+      position: absolute; top: 10px; left: 10px;
+      background: rgba(0,0,0,.6); backdrop-filter: blur(6px);
+      color: rgba(255,255,255,.6); font-size: 10px; font-weight: 700;
+      text-transform: uppercase; letter-spacing: .6px;
+      padding: 3px 8px; border-radius: 6px;
+    }
 
-    /* Translation box at bottom */
-    .translation-box {
-      position: relative; z-index: 2;
-      padding: 0 16px;
-      padding-bottom: max(24px, env(safe-area-inset-bottom));
+    /* Divider with arrow */
+    .translate-divider {
+      display: flex; align-items: center; justify-content: center;
+      gap: 10px; padding: 10px 16px;
+      background: var(--bg); flex-shrink: 0;
     }
-    .translation-card {
-      background: var(--card-bg);
-      backdrop-filter: blur(16px);
-      border: 1px solid rgba(255,255,255,.1);
-      border-radius: var(--radius);
-      overflow: hidden;
+    .divider-line { flex: 1; height: 1px; background: var(--border); }
+    .divider-arrow {
+      background: var(--accent);
+      color: #fff; width: 30px; height: 30px; border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 15px; flex-shrink: 0;
     }
-    .tr-section {
-      padding: 14px 16px;
+
+    /* Translation content */
+    .result-content {
+      padding: 0 14px 40px;
+      padding-bottom: max(40px, env(safe-area-inset-bottom));
+      flex: 1;
     }
-    .tr-section + .tr-section {
-      border-top: 1px solid rgba(255,255,255,.08);
+
+    .result-card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 16px; overflow: hidden;
     }
-    .tr-label {
+    .rc-section { padding: 16px; }
+    .rc-section + .rc-section { border-top: 1px solid var(--border); }
+    .rc-label {
       font-size: 10px; font-weight: 700;
       text-transform: uppercase; letter-spacing: .8px;
-      color: var(--muted); margin-bottom: 6px;
+      color: var(--muted); margin-bottom: 8px;
       display: flex; align-items: center; justify-content: space-between;
     }
-    .tr-text {
-      font-size: 16px; line-height: 1.5;
+    .rc-translation {
+      font-size: 17px; line-height: 1.55;
+      font-weight: 600; color: #fff;
       white-space: pre-wrap; word-break: break-word;
-      color: #fff; font-weight: 500;
     }
-    .tr-orig {
-      font-size: 13px; line-height: 1.45;
-      color: var(--muted); white-space: pre-wrap; word-break: break-word;
+    .rc-original {
+      font-size: 13px; line-height: 1.5;
+      color: var(--muted); font-style: italic;
+      white-space: pre-wrap; word-break: break-word;
     }
     .btn-copy {
-      background: rgba(255,255,255,.08);
-      border: 1px solid rgba(255,255,255,.15);
-      color: var(--muted);
-      font-size: 11px; padding: 3px 10px;
-      border-radius: 6px; cursor: pointer;
+      background: none; border: 1px solid var(--border);
+      color: var(--muted); font-size: 11px;
+      padding: 3px 10px; border-radius: 6px; cursor: pointer;
     }
     .btn-copy.ok { color: var(--success); border-color: var(--success); }
 
-    /* Loading overlay over photo */
-    .loading-overlay {
-      position: absolute; inset: 0; z-index: 3;
+    /* Loading */
+    .loading-wrap {
       display: flex; flex-direction: column;
-      align-items: center; justify-content: center; gap: 14px;
-      background: rgba(0,0,0,.45);
-      backdrop-filter: blur(2px);
+      align-items: center; justify-content: center;
+      gap: 16px; padding: 48px 16px;
     }
     .spinner {
-      width: 44px; height: 44px;
-      border: 3px solid rgba(255,255,255,.2);
+      width: 42px; height: 42px;
+      border: 3px solid var(--border);
       border-top-color: var(--accent2);
       border-radius: 50%;
-      animation: spin .8s linear infinite;
+      animation: spin .75s linear infinite;
     }
     @keyframes spin { to { transform: rotate(360deg); } }
-    .loading-label { font-size: 14px; color: #fff; font-weight: 500; }
+    .loading-text { color: var(--muted); font-size: 14px; }
 
-    /* Error inside result screen */
-    .error-box {
-      background: rgba(239,68,68,.15);
-      border: 1px solid rgba(239,68,68,.3);
-      border-radius: var(--radius);
-      padding: 16px;
-      font-size: 14px; color: #fca5a5;
+    /* Error / no-text */
+    .msg-box {
+      padding: 18px; border-radius: 14px;
+      font-size: 14px; text-align: center; line-height: 1.5;
     }
-
-    /* No-text box */
-    .notext-box {
-      background: var(--card-bg);
-      backdrop-filter: blur(16px);
-      border: 1px solid rgba(255,255,255,.1);
-      border-radius: var(--radius);
-      padding: 20px; text-align: center;
-      font-size: 14px; color: var(--muted);
-    }
+    .msg-box.error { background: rgba(239,68,68,.1); border: 1px solid rgba(239,68,68,.3); color: #fca5a5; }
+    .msg-box.info  { background: var(--card); border: 1px solid var(--border); color: var(--muted); }
   </style>
 </head>
 <body>
 
-<!-- Live camera -->
-<video id="video" autoplay playsinline muted></video>
-<canvas id="canvas"></canvas>
-<div class="guide"><div class="c"></div></div>
-<div class="scan-bar" id="scanBar"></div>
-<div class="flash" id="flash"></div>
+<!-- ── Camera Screen ───────────────────────────────────────── -->
+<div id="cameraScreen">
+  <video id="video" autoplay playsinline muted></video>
+  <canvas id="canvas"></canvas>
+  <div class="guide"><div class="c"></div></div>
+  <div class="flash" id="flash"></div>
+  <div class="scan-line" id="scanLine"></div>
 
-<div class="cam-error" id="camError">
-  <div style="font-size:48px">📷</div>
-  <div style="font-size:16px;font-weight:600">Kamera nicht verfügbar</div>
-  <div style="color:var(--muted);font-size:14px;line-height:1.5">
-    Bitte erlaube den Kamera-Zugriff.<br><br>
-    iPhone: Einstellungen → Safari → Kamera → Erlauben
+  <div class="cam-error" id="camError">
+    <div style="font-size:48px">📷</div>
+    <div style="font-weight:600;font-size:16px;color:#fff">Kamera nicht verfügbar</div>
+    <div style="color:var(--muted);font-size:13px;line-height:1.6">
+      Bitte erlaube den Kamerazugriff im Browser.<br>
+      iPhone: Einstellungen → Safari → Kamera → Erlauben
+    </div>
+    <button onclick="startCamera()"
+      style="margin-top:10px;background:var(--accent);color:#fff;border:none;padding:10px 22px;border-radius:10px;font-size:14px;cursor:pointer">
+      Nochmal versuchen
+    </button>
   </div>
-  <button onclick="startCamera()" style="margin-top:8px;background:var(--accent);color:#fff;border:none;padding:10px 20px;border-radius:10px;font-size:14px;cursor:pointer">
-    Nochmal versuchen
-  </button>
+
+  <div class="shutter-bar">
+    <button class="btn-round" onclick="flipCamera()">🔄</button>
+    <button class="btn-shutter" id="btnCapture" onclick="capture()">📸</button>
+    <div style="width:50px"></div>
+  </div>
 </div>
 
-<!-- Shutter bar -->
-<div class="shutter-bar">
-  <button class="btn-round" onclick="flipCamera()">🔄</button>
-  <button class="btn-shutter" id="btnCapture" onclick="capture()">📸</button>
-  <div style="width:48px"></div>
-</div>
-
-<!-- Result screen (fullscreen) -->
+<!-- ── Result Screen ───────────────────────────────────────── -->
 <div id="resultScreen">
-  <img id="resultPhoto" src="" alt="">
-  <div class="photo-gradient"></div>
-  <div id="loadingOverlay" class="loading-overlay" style="display:none">
-    <div class="spinner"></div>
-    <div class="loading-label">KI übersetzt…</div>
-  </div>
 
+  <!-- Sticky top bar -->
   <div class="result-topbar">
     <button class="btn-back" onclick="closeResult()">← Kamera</button>
-    <div class="lang-badge" id="langBadge" style="display:none"></div>
+    <div class="lang-pill" id="langPill" style="visibility:hidden">…</div>
   </div>
 
-  <div class="result-spacer"></div>
+  <!-- Photo -->
+  <div class="photo-wrap">
+    <img id="resultPhoto" src="" alt="Aufgenommenes Foto">
+    <div class="photo-label">Originalfoto</div>
+  </div>
 
-  <div class="translation-box" id="translationBox"></div>
+  <!-- Arrow divider -->
+  <div class="translate-divider">
+    <div class="divider-line"></div>
+    <div class="divider-arrow">↓</div>
+    <div class="divider-line"></div>
+  </div>
+
+  <!-- Translation content -->
+  <div class="result-content" id="resultContent">
+    <div class="loading-wrap">
+      <div class="spinner"></div>
+      <div class="loading-text">KI übersetzt…</div>
+    </div>
+  </div>
+
 </div>
 
 <script>
   let stream = null;
   let facingMode = 'environment';
 
-  // ── Camera ──────────────────────────────────────────────────
+  // ── Camera ─────────────────────────────────────────────────
   async function startCamera() {
-    document.getElementById('camError').classList.remove('visible');
+    document.getElementById('camError').classList.remove('on');
     try {
       if (stream) stream.getTracks().forEach(t => t.stop());
       stream = await navigator.mediaDevices.getUserMedia({
@@ -325,8 +309,8 @@
         audio: false,
       });
       document.getElementById('video').srcObject = stream;
-    } catch (e) {
-      document.getElementById('camError').classList.add('visible');
+    } catch {
+      document.getElementById('camError').classList.add('on');
     }
   }
 
@@ -342,28 +326,31 @@
     const btn = document.getElementById('btnCapture');
     if (!stream) return;
 
-    // Flash
+    // Flash effect
     const fl = document.getElementById('flash');
     fl.classList.add('on');
-    setTimeout(() => fl.classList.remove('on'), 120);
+    setTimeout(() => fl.classList.remove('on'), 130);
 
-    // Draw frame
+    // Draw frame to canvas
     canvas.width  = video.videoWidth  || 640;
     canvas.height = video.videoHeight || 480;
     canvas.getContext('2d').drawImage(video, 0, 0);
-
-    // Resize to max 1100px to speed up API
     const imageData = resizeCanvas(canvas, 1100);
 
-    // Show result screen with photo + loading
+    // Show result screen immediately with photo + spinner
     document.getElementById('resultPhoto').src = imageData;
-    document.getElementById('langBadge').style.display = 'none';
-    document.getElementById('translationBox').innerHTML = '';
-    document.getElementById('loadingOverlay').style.display = 'flex';
-    document.getElementById('resultScreen').classList.add('open');
+    document.getElementById('langPill').style.visibility = 'hidden';
+    document.getElementById('resultContent').innerHTML = `
+      <div class="loading-wrap">
+        <div class="spinner"></div>
+        <div class="loading-text">KI übersetzt…</div>
+      </div>`;
+    const rs = document.getElementById('resultScreen');
+    rs.classList.add('open');
+    rs.scrollTop = 0;
 
     btn.disabled = true;
-    document.getElementById('scanBar').style.display = 'block';
+    document.getElementById('scanLine').style.display = 'block';
 
     try {
       const res  = await fetch('/api/translate', {
@@ -372,59 +359,58 @@
         body: JSON.stringify({ image: imageData }),
       });
       const data = await res.json();
-      showResult(data);
+      renderResult(data);
     } catch (e) {
-      showError('Netzwerkfehler: ' + e.message);
+      renderError('Netzwerkfehler: ' + e.message);
     } finally {
       btn.disabled = false;
-      document.getElementById('scanBar').style.display = 'none';
-      document.getElementById('loadingOverlay').style.display = 'none';
+      document.getElementById('scanLine').style.display = 'none';
     }
   }
 
   function resizeCanvas(canvas, maxW) {
     if (canvas.width <= maxW) return canvas.toDataURL('image/jpeg', 0.82);
-    const scale = maxW / canvas.width;
-    const tmp = document.createElement('canvas');
-    tmp.width  = maxW;
-    tmp.height = Math.round(canvas.height * scale);
-    tmp.getContext('2d').drawImage(canvas, 0, 0, tmp.width, tmp.height);
-    return tmp.toDataURL('image/jpeg', 0.82);
+    const s = maxW / canvas.width;
+    const t = document.createElement('canvas');
+    t.width  = maxW;
+    t.height = Math.round(canvas.height * s);
+    t.getContext('2d').drawImage(canvas, 0, 0, t.width, t.height);
+    return t.toDataURL('image/jpeg', 0.82);
   }
 
-  // ── Result rendering ─────────────────────────────────────────
-  function showResult(data) {
-    if (!data.success) { showError(data.error || 'Fehler'); return; }
+  // ── Render ──────────────────────────────────────────────────
+  function renderResult(data) {
+    if (!data.success) { renderError(data.error || 'Fehler'); return; }
 
     if (data.kein_text) {
-      document.getElementById('translationBox').innerHTML =
-        `<div class="notext-box">🔍 Kein Text erkannt – näher ran halten</div>`;
+      document.getElementById('resultContent').innerHTML =
+        `<div class="msg-box info">🔍 Kein Text erkannt – näher ans Dokument halten und nochmal probieren.</div>`;
       return;
     }
 
-    const badge = document.getElementById('langBadge');
-    badge.textContent = `🌍 ${esc(data.erkannte_sprache || '?')} → Deutsch`;
-    badge.style.display = '';
+    const pill = document.getElementById('langPill');
+    pill.textContent = `🌍 ${esc(data.erkannte_sprache || '?')} → Deutsch`;
+    pill.style.visibility = 'visible';
 
-    document.getElementById('translationBox').innerHTML = `
-      <div class="translation-card">
-        <div class="tr-section">
-          <div class="tr-label">
+    document.getElementById('resultContent').innerHTML = `
+      <div class="result-card">
+        <div class="rc-section">
+          <div class="rc-label">
             Deutsche Übersetzung
-            <button class="btn-copy" id="copyBtn" onclick="copyText(this, ${JSON.stringify(data.uebersetzung)})">Kopieren</button>
+            <button class="btn-copy" onclick="doCopy(this,${JSON.stringify(data.uebersetzung)})">Kopieren</button>
           </div>
-          <div class="tr-text">${esc(data.uebersetzung)}</div>
+          <div class="rc-translation">${esc(data.uebersetzung)}</div>
         </div>
-        <div class="tr-section">
-          <div class="tr-label">Original</div>
-          <div class="tr-orig">${esc(data.original)}</div>
+        <div class="rc-section">
+          <div class="rc-label">Originaltext</div>
+          <div class="rc-original">${esc(data.original)}</div>
         </div>
       </div>`;
   }
 
-  function showError(msg) {
-    document.getElementById('translationBox').innerHTML =
-      `<div class="error-box">⚠️ ${esc(msg)}</div>`;
+  function renderError(msg) {
+    document.getElementById('resultContent').innerHTML =
+      `<div class="msg-box error">⚠️ ${esc(msg)}</div>`;
   }
 
   function closeResult() {
@@ -432,17 +418,18 @@
   }
 
   // ── Helpers ──────────────────────────────────────────────────
-  async function copyText(btn, text) {
+  async function doCopy(btn, text) {
     try {
       await navigator.clipboard.writeText(text);
-      btn.textContent = 'Kopiert ✓';
-      btn.classList.add('ok');
+      btn.textContent = 'Kopiert ✓'; btn.classList.add('ok');
       setTimeout(() => { btn.textContent = 'Kopieren'; btn.classList.remove('ok'); }, 2000);
     } catch {}
   }
 
   function esc(s) {
-    return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    return String(s ?? '')
+      .replace(/&/g,'&amp;').replace(/</g,'&lt;')
+      .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
   }
 
   startCamera();
