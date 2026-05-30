@@ -154,58 +154,96 @@
     .cam-error-icon { font-size: 48px; }
     .cam-error-text { color: var(--muted); font-size: 14px; line-height: 1.5; }
 
-    /* ── Bottom panel ────────────────────────────────────────── */
-    .bottom {
-      background: var(--surface);
-      border-top: 1px solid var(--border);
-      flex-shrink: 0;
-      display: flex;
-      flex-direction: column;
-      max-height: 55vh;
-    }
-
-    /* Shutter row */
-    .shutter-row {
+    /* ── Fixed shutter bar ───────────────────────────────────── */
+    .shutter-bar {
+      position: fixed;
+      bottom: 0; left: 0; right: 0;
+      z-index: 100;
       display: flex;
       align-items: center;
       justify-content: center;
-      gap: 24px;
-      padding: 16px;
-      flex-shrink: 0;
+      gap: 32px;
+      padding: 14px 24px;
+      padding-bottom: max(14px, env(safe-area-inset-bottom));
+      background: linear-gradient(to top, rgba(10,10,15,.95) 70%, transparent);
     }
     .btn-shutter {
-      width: 72px; height: 72px;
+      width: 76px; height: 76px;
       border-radius: 50%;
-      background: var(--accent);
-      border: none;
+      background: #fff;
+      border: 4px solid rgba(255,255,255,.3);
       cursor: pointer;
       display: flex; align-items: center; justify-content: center;
-      font-size: 26px;
-      color: #fff;
-      box-shadow: 0 0 0 4px rgba(99,102,241,.25);
-      transition: transform .1s, background .15s;
+      font-size: 28px;
+      box-shadow: 0 0 0 3px var(--accent), 0 4px 20px rgba(0,0,0,.5);
+      transition: transform .1s;
       flex-shrink: 0;
     }
-    .btn-shutter:active { transform: scale(.93); }
-    .btn-shutter:disabled { background: var(--border); box-shadow: none; cursor: default; }
+    .btn-shutter:active { transform: scale(.9); }
+    .btn-shutter:disabled { opacity: .4; cursor: default; transform: none; }
 
     .btn-flip {
-      background: var(--card);
-      border: 1px solid var(--border);
-      color: var(--text);
-      width: 48px; height: 48px;
+      background: rgba(255,255,255,.15);
+      backdrop-filter: blur(8px);
+      border: 1px solid rgba(255,255,255,.2);
+      color: #fff;
+      width: 50px; height: 50px;
       border-radius: 50%;
       display: flex; align-items: center; justify-content: center;
       cursor: pointer;
       font-size: 20px;
     }
-    .btn-flip:active { background: var(--border); }
+    .btn-flip:active { background: rgba(255,255,255,.3); }
+
+    /* ── Bottom sheet (result) ────────────────────────────────── */
+    .bottom {
+      display: none;
+      position: fixed;
+      bottom: 0; left: 0; right: 0;
+      z-index: 200;
+      background: var(--surface);
+      border-radius: 20px 20px 0 0;
+      border-top: 1px solid var(--border);
+      max-height: 70vh;
+      flex-direction: column;
+      box-shadow: 0 -8px 40px rgba(0,0,0,.6);
+      animation: slideUp .25s ease;
+    }
+    .bottom.open { display: flex; }
+    @keyframes slideUp {
+      from { transform: translateY(100%); }
+      to   { transform: translateY(0); }
+    }
+    .sheet-handle {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 12px 16px 8px;
+      flex-shrink: 0;
+    }
+    .sheet-drag {
+      width: 40px; height: 4px;
+      background: var(--border);
+      border-radius: 2px;
+      margin: 0 auto;
+    }
+    .btn-close-sheet {
+      background: var(--card);
+      border: 1px solid var(--border);
+      color: var(--muted);
+      width: 30px; height: 30px;
+      border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      cursor: pointer;
+      font-size: 14px;
+      flex-shrink: 0;
+    }
 
     /* Result card */
     .result-area {
       overflow-y: auto;
-      padding: 0 16px 16px;
-      padding-bottom: max(16px, env(safe-area-inset-bottom));
+      padding: 0 16px;
+      padding-bottom: max(100px, calc(env(safe-area-inset-bottom) + 100px));
       flex: 1 1 0;
       min-height: 0;
     }
@@ -385,22 +423,21 @@
     </div>
   </div>
 
-  <!-- Bottom panel -->
-  <div class="bottom">
-    <div class="shutter-row">
-      <button class="btn-flip" id="btnFlip" onclick="flipCamera()" title="Kamera wechseln">🔄</button>
-      <button class="btn-shutter" id="btnCapture" onclick="capture()">📸</button>
-      <div style="width:48px"></div>
+  <!-- Fixed shutter bar – always visible -->
+  <div class="shutter-bar">
+    <button class="btn-flip" id="btnFlip" onclick="flipCamera()" title="Kamera wechseln">🔄</button>
+    <button class="btn-shutter" id="btnCapture" onclick="capture()">📸</button>
+    <div style="width:50px"></div>
+  </div>
+
+  <!-- Bottom sheet – slides up with result -->
+  <div class="bottom" id="bottomSheet">
+    <div class="sheet-handle">
+      <div style="width:30px"></div>
+      <div class="sheet-drag"></div>
+      <button class="btn-close-sheet" onclick="closeSheet()">✕</button>
     </div>
-
     <div class="result-area" id="resultArea">
-      <div class="result-card">
-        <div class="result-placeholder">📷 Foto aufnehmen → KI übersetzt automatisch</div>
-      </div>
-
-      <button class="history-toggle" id="historyToggle" onclick="toggleHistory()" style="display:none">
-        <span id="histArrow">▾</span> Verlauf (<span id="histCount">0</span>)
-      </button>
       <div class="history-list" id="historyList"></div>
     </div>
   </div>
@@ -488,8 +525,17 @@
     }
   }
 
+  // ── Sheet open/close ────────────────────────────────────────
+  function openSheet() {
+    document.getElementById('bottomSheet').classList.add('open');
+  }
+  function closeSheet() {
+    document.getElementById('bottomSheet').classList.remove('open');
+  }
+
   // ── Result rendering ────────────────────────────────────────
   function showLoading() {
+    openSheet();
     document.getElementById('resultArea').innerHTML = `
       <div class="loading-card">
         <div class="spinner"></div>
@@ -499,12 +545,14 @@
   }
 
   function showError(msg) {
+    openSheet();
     document.getElementById('resultArea').innerHTML = `
       <div class="error-card">⚠️ <span>${escHtml(msg)}</span></div>
     `;
   }
 
   function showNoText() {
+    openSheet();
     document.getElementById('resultArea').innerHTML = `
       <div class="result-card">
         <div class="result-placeholder">🔍 Kein Text erkannt — halte die Kamera näher ans Dokument</div>
@@ -513,7 +561,8 @@
   }
 
   function showResult(data) {
-    const areaHtml = `
+    openSheet();
+    document.getElementById('resultArea').innerHTML = `
       <div class="result-card">
         <div class="result-section" style="padding-bottom:10px">
           <span class="result-lang-badge">🌍 ${escHtml(data.erkannte_sprache || 'Unbekannt')} → Deutsch</span>
@@ -532,7 +581,6 @@
       </div>
       ${renderHistoryToggle()}
     `;
-    document.getElementById('resultArea').innerHTML = areaHtml;
     renderHistoryItems();
   }
 
