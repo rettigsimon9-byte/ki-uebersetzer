@@ -481,8 +481,7 @@
     canvas.getContext('2d').drawImage(video, 0, 0);
     capturedImage = resizeCanvas(canvas, 1100);
 
-    // Nativer Prompt-Dialog — iOS-kompatibel, garantiert
-    const beschreibung = window.prompt('Hinweis optional:\nz.B. Griff klemmt / Blatt wird gelb', '') || '';
+    const beschreibung = '';
 
     // Ergebnis-Screen zeigen + Analyse starten
     const m = MODES[currentMode];
