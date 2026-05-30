@@ -3,43 +3,131 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <meta name="theme-color" content="#000">
+  <meta name="theme-color" content="#0a0a0f">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <title>KI Übersetzer</title>
+  <title>KI Kamera</title>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     :root {
-      --accent:  #6366f1;
-      --accent2: #818cf8;
       --bg:      #0a0a0f;
+      --surface: #12121a;
       --card:    #16161f;
       --border:  #2a2a3a;
+      --accent:  #6366f1;
+      --accent2: #818cf8;
       --text:    #e2e8f0;
       --muted:   #64748b;
       --success: #22c55e;
+      --r:       16px;
     }
     html, body {
-      height: 100%; background: #000;
-      color: var(--text);
+      height: 100%; background: var(--bg); color: var(--text);
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
       overflow: hidden;
     }
 
-    /* ═══ KAMERA ════════════════════════════════════════════ */
-    #cameraScreen { position: fixed; inset: 0; z-index: 1; }
-    #video { width: 100%; height: 100%; object-fit: cover; display: block; }
+    /* ══ SCREENS ═══════════════════════════════════════════ */
+    .screen {
+      position: fixed; inset: 0; z-index: 1;
+      display: none; flex-direction: column;
+    }
+    .screen.active { display: flex; }
+
+    /* ══ DASHBOARD ══════════════════════════════════════════ */
+    #dashboard {
+      background: var(--bg);
+      overflow-y: auto; -webkit-overflow-scrolling: touch;
+    }
+    .dash-header {
+      padding: 20px 20px 10px;
+      padding-top: max(20px, env(safe-area-inset-top));
+      flex-shrink: 0;
+    }
+    .dash-title {
+      font-size: 28px; font-weight: 800; letter-spacing: -0.5px;
+    }
+    .dash-title span { color: var(--accent2); }
+    .dash-sub {
+      color: var(--muted); font-size: 14px; margin-top: 4px;
+    }
+    .mode-grid {
+      display: grid; grid-template-columns: 1fr 1fr;
+      gap: 12px; padding: 16px 16px;
+      padding-bottom: max(24px, env(safe-area-inset-bottom));
+    }
+    .mode-card {
+      background: var(--card); border: 1px solid var(--border);
+      border-radius: 20px; padding: 20px 16px;
+      cursor: pointer; user-select: none;
+      transition: transform .12s, border-color .15s;
+      display: flex; flex-direction: column; gap: 10px;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .mode-card:active { transform: scale(.96); }
+    .mode-card.featured {
+      grid-column: 1 / -1;
+      flex-direction: row; align-items: center; gap: 16px;
+      padding: 20px;
+    }
+    .mode-card:hover { border-color: var(--accent); }
+    .mode-icon {
+      font-size: 36px; line-height: 1;
+    }
+    .mode-card.featured .mode-icon { font-size: 44px; flex-shrink: 0; }
+    .mode-name {
+      font-size: 15px; font-weight: 700; color: var(--text);
+    }
+    .mode-desc {
+      font-size: 12px; color: var(--muted); line-height: 1.4;
+    }
+    .mode-badge {
+      display: inline-block; font-size: 10px; font-weight: 700;
+      text-transform: uppercase; letter-spacing: .5px;
+      background: rgba(99,102,241,.18); color: var(--accent2);
+      border: 1px solid rgba(99,102,241,.3);
+      padding: 2px 8px; border-radius: 20px; margin-top: 2px;
+      width: fit-content;
+    }
+    .section-label {
+      font-size: 11px; font-weight: 700; text-transform: uppercase;
+      letter-spacing: .8px; color: var(--muted);
+      padding: 4px 16px 0;
+    }
+
+    /* ══ KAMERA ═════════════════════════════════════════════ */
+    #cameraScreen { background: #000; }
+    #video { width: 100%; height: 100%; object-fit: cover; display: block; flex: 1; }
     #canvas { display: none; }
+
+    .cam-topbar {
+      position: absolute; top: 0; left: 0; right: 0; z-index: 10;
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 12px 16px; padding-top: max(12px, env(safe-area-inset-top));
+      background: linear-gradient(to bottom, rgba(0,0,0,.6), transparent);
+    }
+    .btn-back-cam {
+      background: rgba(0,0,0,.45); backdrop-filter: blur(8px);
+      border: 1px solid rgba(255,255,255,.15); color: #fff;
+      padding: 7px 14px; border-radius: 20px;
+      font-size: 14px; font-weight: 600; cursor: pointer;
+    }
+    .mode-indicator {
+      background: rgba(0,0,0,.45); backdrop-filter: blur(8px);
+      border: 1px solid rgba(255,255,255,.15);
+      padding: 6px 12px; border-radius: 20px;
+      font-size: 13px; font-weight: 600; color: #fff;
+    }
 
     .guide { position: absolute; inset: 0; pointer-events: none; }
     .guide::before, .guide::after, .guide .c::before, .guide .c::after {
-      content: ''; position: absolute; width: 28px; height: 28px;
-      border-color: rgba(255,255,255,.6); border-style: solid;
+      content: ''; position: absolute; width: 26px; height: 26px;
+      border-color: rgba(255,255,255,.55); border-style: solid;
     }
-    .guide::before  { top: 60px; left: 20px; border-width: 2px 0 0 2px; border-radius: 3px 0 0 0; }
-    .guide::after   { top: 60px; right: 20px; border-width: 2px 2px 0 0; border-radius: 0 3px 0 0; }
-    .guide .c::before { bottom: 120px; left: 20px; border-width: 0 0 2px 2px; border-radius: 0 0 0 3px; }
-    .guide .c::after  { bottom: 120px; right: 20px; border-width: 0 2px 2px 0; border-radius: 0 0 3px 0; }
+    .guide::before  { top: 70px; left: 20px; border-width: 2px 0 0 2px; border-radius: 3px 0 0 0; }
+    .guide::after   { top: 70px; right: 20px; border-width: 2px 2px 0 0; border-radius: 0 3px 0 0; }
+    .guide .c::before { bottom: 110px; left: 20px; border-width: 0 0 2px 2px; border-radius: 0 0 0 3px; }
+    .guide .c::after  { bottom: 110px; right: 20px; border-width: 0 2px 2px 0; border-radius: 0 0 3px 0; }
 
     .flash { position: absolute; inset: 0; background: #fff; opacity: 0; pointer-events: none; transition: opacity .05s; }
     .flash.on { opacity: .65; }
@@ -48,7 +136,7 @@
       background: linear-gradient(90deg, transparent, var(--accent2), transparent);
       animation: scan 1.3s ease-in-out infinite;
     }
-    @keyframes scan { 0%,100% { top: 8%; } 50% { top: 86%; } }
+    @keyframes scan { 0%,100% { top: 10%; } 50% { top: 88%; } }
 
     .shutter-bar {
       position: absolute; bottom: 0; left: 0; right: 0;
@@ -82,19 +170,15 @@
     }
     .cam-error.on { display: flex; }
 
-    /* ═══ ERGEBNIS-SCREEN ═══════════════════════════════════ */
+    /* ══ ERGEBNIS ═══════════════════════════════════════════ */
     #resultScreen {
-      position: fixed; inset: 0; z-index: 200;
-      display: none; flex-direction: column;
       background: var(--bg);
       overflow-y: scroll; -webkit-overflow-scrolling: touch;
       overscroll-behavior: contain;
       animation: slideUp .22s ease;
     }
-    #resultScreen.open { display: flex; }
     @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
 
-    /* Sticky Header */
     .result-topbar {
       position: sticky; top: 0; z-index: 10;
       display: flex; align-items: center; justify-content: space-between;
@@ -102,32 +186,26 @@
       background: rgba(10,10,15,.95); backdrop-filter: blur(12px);
       border-bottom: 1px solid var(--border); flex-shrink: 0;
     }
-    .btn-back {
+    .btn-back-res {
       background: var(--card); border: 1px solid var(--border);
       color: var(--text); padding: 7px 14px; border-radius: 20px;
       font-size: 14px; font-weight: 600; cursor: pointer;
-      display: flex; align-items: center; gap: 5px;
     }
-    .btn-back:active { background: var(--border); }
-    .lang-pill {
+    .btn-back-res:active { background: var(--border); }
+    .res-mode-pill {
       background: rgba(99,102,241,.18); border: 1px solid rgba(99,102,241,.35);
       color: var(--accent2); font-size: 11px; font-weight: 700;
       text-transform: uppercase; letter-spacing: .5px;
       padding: 5px 12px; border-radius: 20px;
     }
 
-    /* Übersetztes Bild */
-    #translatedCanvas {
-      width: 100%; display: block;
-      background: #000;
-    }
+    /* Foto */
+    #resultPhoto { width: 100%; display: block; background: #000; max-height: 48vh; object-fit: contain; }
 
-    /* Ladeoverlay über Bild */
-    .img-loading {
-      display: flex; flex-direction: column;
-      align-items: center; justify-content: center;
-      gap: 14px; padding: 60px 20px;
-      background: var(--bg);
+    /* Loading */
+    .loading-wrap {
+      display: flex; flex-direction: column; align-items: center;
+      justify-content: center; gap: 14px; padding: 56px 20px;
     }
     .spinner {
       width: 44px; height: 44px;
@@ -136,67 +214,163 @@
     }
     @keyframes spin { to { transform: rotate(360deg); } }
 
-    /* Original-Text-Liste */
-    .original-section {
-      padding: 16px 14px; padding-bottom: max(32px, env(safe-area-inset-bottom));
-    }
-    .orig-header {
-      font-size: 10px; font-weight: 700; text-transform: uppercase;
-      letter-spacing: .8px; color: var(--muted); margin-bottom: 10px;
-    }
-    .orig-card {
+    /* Karten */
+    .res-content { padding: 14px 14px; padding-bottom: max(32px, env(safe-area-inset-bottom)); }
+
+    .res-card {
       background: var(--card); border: 1px solid var(--border);
-      border-radius: 14px; overflow: hidden;
+      border-radius: var(--r); overflow: hidden; margin-bottom: 10px;
     }
-    .orig-row {
-      display: grid; grid-template-columns: 1fr 1fr; gap: 0;
+    .rc-row { padding: 14px 16px; border-bottom: 1px solid var(--border); }
+    .rc-row:last-child { border-bottom: none; }
+    .rc-label {
+      font-size: 10px; font-weight: 700; text-transform: uppercase;
+      letter-spacing: .8px; color: var(--muted); margin-bottom: 6px;
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .rc-text { font-size: 15px; line-height: 1.55; white-space: pre-wrap; word-break: break-word; }
+    .rc-text.big { font-size: 20px; font-weight: 700; color: #fff; }
+    .rc-text.sub { font-size: 13px; color: var(--accent2); font-weight: 600; }
+    .rc-text.body { font-size: 14px; color: #cbd5e1; line-height: 1.6; }
+    .rc-text.muted { font-size: 13px; color: var(--muted); font-style: italic; }
+
+    /* Fakten-Chips */
+    .facts-wrap { display: flex; flex-wrap: wrap; gap: 8px; padding: 14px 16px; }
+    .fact-chip {
+      background: rgba(99,102,241,.12); border: 1px solid rgba(99,102,241,.25);
+      color: var(--text); font-size: 12px; padding: 5px 12px;
+      border-radius: 20px; line-height: 1.3;
+    }
+
+    /* Übersetzungs-Tabelle */
+    .tr-table { display: flex; flex-direction: column; }
+    .tr-row {
+      display: grid; grid-template-columns: 1fr 1fr;
       padding: 12px 14px; border-bottom: 1px solid var(--border);
     }
-    .orig-row:last-child { border-bottom: none; }
-    .orig-left {
-      font-size: 13px; color: var(--muted); padding-right: 10px;
-      border-right: 1px solid var(--border); line-height: 1.4;
+    .tr-row:last-child { border-bottom: none; }
+    .tr-orig { font-size: 13px; color: var(--muted); padding-right: 10px; border-right: 1px solid var(--border); line-height: 1.4; }
+    .tr-de   { font-size: 13px; color: var(--text); font-weight: 500; padding-left: 10px; line-height: 1.4; }
+
+    .btn-copy {
+      background: none; border: 1px solid var(--border);
+      color: var(--muted); font-size: 11px; padding: 3px 10px;
+      border-radius: 6px; cursor: pointer;
     }
-    .orig-right {
-      font-size: 13px; color: var(--text); font-weight: 500;
-      padding-left: 10px; line-height: 1.4;
-    }
-    .copy-all-btn {
-      width: 100%; margin-top: 10px;
-      background: var(--card); border: 1px solid var(--border);
-      color: var(--muted); padding: 10px; border-radius: 10px;
-      font-size: 13px; cursor: pointer;
-    }
-    .copy-all-btn.ok { color: var(--success); border-color: var(--success); }
+    .btn-copy.ok { color: var(--success); border-color: var(--success); }
 
     .msg-box {
-      margin: 16px; padding: 18px; border-radius: 14px;
-      font-size: 14px; text-align: center; line-height: 1.5;
+      padding: 20px; border-radius: var(--r); font-size: 14px;
+      text-align: center; line-height: 1.5; margin-bottom: 10px;
     }
     .msg-box.error { background: rgba(239,68,68,.1); border: 1px solid rgba(239,68,68,.3); color: #fca5a5; }
     .msg-box.info  { background: var(--card); border: 1px solid var(--border); color: var(--muted); }
+
+    /* Divider */
+    .photo-divider {
+      display: flex; align-items: center; gap: 10px;
+      padding: 8px 14px; flex-shrink: 0;
+    }
+    .div-line { flex: 1; height: 1px; background: var(--border); }
+    .div-dot {
+      width: 28px; height: 28px; border-radius: 50%; background: var(--accent);
+      color: #fff; display: flex; align-items: center; justify-content: center; font-size: 14px;
+    }
   </style>
 </head>
 <body>
 
-<!-- Kamera -->
-<div id="cameraScreen">
+<!-- ══ DASHBOARD ═══════════════════════════════════════════ -->
+<div id="dashboard" class="screen active">
+  <div class="dash-header">
+    <div class="dash-title">KI <span>Kamera</span></div>
+    <div class="dash-sub">Wähle eine Funktion</div>
+  </div>
+
+  <div class="section-label">Beliebt</div>
+  <div class="mode-grid">
+
+    <div class="mode-card featured" onclick="openMode('translate')">
+      <div class="mode-icon">🌍</div>
+      <div>
+        <div class="mode-name">Text übersetzen</div>
+        <div class="mode-desc">Text auf Foto erkennen und direkt ins Deutsche übersetzen</div>
+        <div class="mode-badge">Übersetzer</div>
+      </div>
+    </div>
+
+    <div class="mode-card" onclick="openMode('landmark')">
+      <div class="mode-icon">🗺️</div>
+      <div>
+        <div class="mode-name">Sehenswürdigkeit</div>
+        <div class="mode-desc">Gebäude fotografieren & Geschichte erfahren</div>
+        <div class="mode-badge">KI Info</div>
+      </div>
+    </div>
+
+    <div class="mode-card" style="opacity:.45;cursor:default">
+      <div class="mode-icon">🧾</div>
+      <div>
+        <div class="mode-name">Kassenbon</div>
+        <div class="mode-desc">Bon scannen & Ausgaben erfassen</div>
+        <div class="mode-badge">Bald</div>
+      </div>
+    </div>
+
+    <div class="mode-card" style="opacity:.45;cursor:default">
+      <div class="mode-icon">🌿</div>
+      <div>
+        <div class="mode-name">Pflanzen</div>
+        <div class="mode-desc">Pflanze erkennen & Infos anzeigen</div>
+        <div class="mode-badge">Bald</div>
+      </div>
+    </div>
+
+    <div class="mode-card" style="opacity:.45;cursor:default">
+      <div class="mode-icon">📄</div>
+      <div>
+        <div class="mode-name">Dokument</div>
+        <div class="mode-desc">Brief/Vertrag einfach erklären lassen</div>
+        <div class="mode-badge">Bald</div>
+      </div>
+    </div>
+
+    <div class="mode-card" style="opacity:.45;cursor:default">
+      <div class="mode-icon">🍽️</div>
+      <div>
+        <div class="mode-name">Rezept-Finder</div>
+        <div class="mode-desc">Kühlschrank fotografieren → Rezeptvorschläge</div>
+        <div class="mode-badge">Bald</div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ══ KAMERA ═══════════════════════════════════════════════ -->
+<div id="cameraScreen" class="screen">
   <video id="video" autoplay playsinline muted></video>
   <canvas id="canvas"></canvas>
   <div class="guide"><div class="c"></div></div>
   <div class="flash" id="flash"></div>
   <div class="scan-line" id="scanLine"></div>
+
+  <div class="cam-topbar">
+    <button class="btn-back-cam" onclick="backToDashboard()">← Zurück</button>
+    <div class="mode-indicator" id="modeIndicator">🌍 Übersetzer</div>
+  </div>
+
   <div class="cam-error" id="camError">
     <div style="font-size:48px">📷</div>
     <div style="font-weight:600;font-size:16px;color:#fff">Kamera nicht verfügbar</div>
-    <div style="color:var(--muted);font-size:13px;line-height:1.6">
+    <div style="color:var(--muted);font-size:13px;line-height:1.6;margin-top:4px">
       Bitte erlaube den Kamerazugriff.<br>iPhone: Einstellungen → Safari → Kamera → Erlauben
     </div>
-    <button onclick="startCamera()"
-      style="margin-top:10px;background:var(--accent);color:#fff;border:none;padding:10px 22px;border-radius:10px;font-size:14px;cursor:pointer">
+    <button onclick="startCamera()" style="margin-top:10px;background:var(--accent);color:#fff;border:none;padding:10px 22px;border-radius:10px;font-size:14px;cursor:pointer">
       Nochmal versuchen
     </button>
   </div>
+
   <div class="shutter-bar">
     <button class="btn-round" onclick="flipCamera()">🔄</button>
     <button class="btn-shutter" id="btnCapture" onclick="capture()">📸</button>
@@ -204,30 +378,57 @@
   </div>
 </div>
 
-<!-- Ergebnis -->
-<div id="resultScreen">
+<!-- ══ ERGEBNIS ══════════════════════════════════════════════ -->
+<div id="resultScreen" class="screen">
   <div class="result-topbar">
-    <button class="btn-back" onclick="closeResult()">← Kamera</button>
-    <div class="lang-pill" id="langPill" style="visibility:hidden">…</div>
+    <button class="btn-back-res" onclick="backToCamera()">← Kamera</button>
+    <div class="res-mode-pill" id="resPill">…</div>
   </div>
 
-  <!-- Bild mit eingemalter Übersetzung ODER Ladeanimation -->
-  <div id="imageArea">
-    <div class="img-loading">
-      <div class="spinner"></div>
-      <div style="color:var(--muted);font-size:14px">KI übersetzt…</div>
-    </div>
+  <img id="resultPhoto" src="" alt="">
+
+  <div class="photo-divider">
+    <div class="div-line"></div>
+    <div class="div-dot" id="divIcon">↓</div>
+    <div class="div-line"></div>
   </div>
 
-  <!-- Originaltexte + Übersetzungen als Liste -->
-  <div id="textList"></div>
+  <div class="res-content" id="resContent">
+    <div class="loading-wrap"><div class="spinner"></div></div>
+  </div>
 </div>
 
 <script>
-  let stream = null;
-  let facingMode = 'environment';
+  let stream = null, facingMode = 'environment', currentMode = 'translate';
 
-  // ── Kamera ──────────────────────────────────────────────────
+  const MODES = {
+    translate: { label: '🌍 Übersetzer', pill: '🌍 Übersetzer',  icon: '🌍', endpoint: '/api/translate' },
+    landmark:  { label: '🗺️ Sehenswürdigkeit', pill: '🗺️ Sehenswürdigkeit', icon: '🗺️', endpoint: '/api/landmark'  },
+  };
+
+  // ── Navigation ───────────────────────────────────────────────
+  function showScreen(id) {
+    document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+    document.getElementById(id).classList.add('active');
+  }
+
+  function openMode(mode) {
+    currentMode = mode;
+    const m = MODES[mode];
+    document.getElementById('modeIndicator').textContent = m.label;
+    document.getElementById('divIcon').textContent = m.icon;
+    showScreen('cameraScreen');
+    startCamera();
+  }
+
+  function backToDashboard() {
+    if (stream) { stream.getTracks().forEach(t => t.stop()); stream = null; }
+    showScreen('dashboard');
+  }
+
+  function backToCamera() { showScreen('cameraScreen'); }
+
+  // ── Kamera ───────────────────────────────────────────────────
   async function startCamera() {
     document.getElementById('camError').classList.remove('on');
     try {
@@ -237,9 +438,7 @@
         audio: false,
       });
       document.getElementById('video').srcObject = stream;
-    } catch {
-      document.getElementById('camError').classList.add('on');
-    }
+    } catch { document.getElementById('camError').classList.add('on'); }
   }
 
   function flipCamera() {
@@ -247,49 +446,43 @@
     startCamera();
   }
 
-  // ── Aufnehmen ───────────────────────────────────────────────
+  // ── Aufnehmen ────────────────────────────────────────────────
   async function capture() {
     const video = document.getElementById('video');
     const canvas = document.getElementById('canvas');
     const btn = document.getElementById('btnCapture');
     if (!stream) return;
 
-    // Blitz
     const fl = document.getElementById('flash');
-    fl.classList.add('on');
-    setTimeout(() => fl.classList.remove('on'), 130);
+    fl.classList.add('on'); setTimeout(() => fl.classList.remove('on'), 130);
 
-    // Frame auf Canvas zeichnen
-    canvas.width  = video.videoWidth  || 640;
-    canvas.height = video.videoHeight || 480;
+    canvas.width = video.videoWidth || 640; canvas.height = video.videoHeight || 480;
     canvas.getContext('2d').drawImage(video, 0, 0);
     const imageData = resizeCanvas(canvas, 1100);
 
-    // Ergebnis-Screen sofort anzeigen (mit Spinner)
-    document.getElementById('langPill').style.visibility = 'hidden';
-    document.getElementById('imageArea').innerHTML = `
-      <div class="img-loading">
-        <div class="spinner"></div>
-        <div style="color:var(--muted);font-size:14px">KI übersetzt…</div>
-      </div>`;
-    document.getElementById('textList').innerHTML = '';
+    // Ergebnis-Screen mit Spinner
+    const m = MODES[currentMode];
+    document.getElementById('resPill').textContent = m.pill;
+    document.getElementById('resultPhoto').src = imageData;
+    document.getElementById('resContent').innerHTML =
+      `<div class="loading-wrap"><div class="spinner"></div><div style="color:var(--muted);font-size:14px">KI analysiert…</div></div>`;
     const rs = document.getElementById('resultScreen');
-    rs.classList.add('open');
+    rs.classList.add('active');
+    document.getElementById('cameraScreen').classList.remove('active');
     rs.scrollTop = 0;
 
     btn.disabled = true;
     document.getElementById('scanLine').style.display = 'block';
 
     try {
-      const res  = await fetch('/api/translate', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+      const res  = await fetch(m.endpoint, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ image: imageData }),
       });
       const data = await res.json();
-      await renderResult(data, imageData);
+      currentMode === 'translate' ? renderTranslate(data, imageData) : renderLandmark(data);
     } catch (e) {
-      document.getElementById('imageArea').innerHTML =
+      document.getElementById('resContent').innerHTML =
         `<div class="msg-box error">⚠️ Netzwerkfehler: ${esc(e.message)}</div>`;
     } finally {
       btn.disabled = false;
@@ -297,82 +490,100 @@
     }
   }
 
-  // ── Ergebnis rendern ────────────────────────────────────────
-  async function renderResult(data, imageDataUrl) {
-    if (!data.success) {
-      document.getElementById('imageArea').innerHTML =
-        `<div class="msg-box error">⚠️ ${esc(data.error || 'Fehler')}</div>`;
-      return;
-    }
-    if (data.kein_text || !data.blocks || data.blocks.length === 0) {
-      document.getElementById('imageArea').innerHTML =
-        `<div class="msg-box info">🔍 Kein Text erkannt – näher ran halten und nochmal probieren.</div>`;
-      return;
+  // ── Übersetzer-Ergebnis ──────────────────────────────────────
+  async function renderTranslate(data, imageDataUrl) {
+    if (!data.success) { showError(data.error); return; }
+    if (data.kein_text || !data.blocks?.length) {
+      document.getElementById('resContent').innerHTML =
+        `<div class="msg-box info">🔍 Kein Text erkannt – näher ran halten.</div>`; return;
     }
 
-    // Sprache anzeigen
-    const pill = document.getElementById('langPill');
-    pill.textContent = `🌍 ${esc(data.sprache || '?')} → Deutsch`;
-    pill.style.visibility = 'visible';
+    const translated = await paintTranslation(imageDataUrl, data.blocks);
+    document.getElementById('resultPhoto').src = translated;
 
-    // Canvas mit Übersetzung rendern
-    const translatedDataUrl = await paintTranslation(imageDataUrl, data.blocks);
-
-    // Bild einsetzen
-    document.getElementById('imageArea').innerHTML =
-      `<img id="translatedCanvas" src="${translatedDataUrl}" alt="Übersetztes Bild">`;
-
-    // Tabelle Original ↔ Deutsch
     const rows = data.blocks.map(b => `
-      <div class="orig-row">
-        <div class="orig-left">${esc(b.original)}</div>
-        <div class="orig-right">${esc(b.deutsch)}</div>
+      <div class="tr-row">
+        <div class="tr-orig">${esc(b.original)}</div>
+        <div class="tr-de">${esc(b.deutsch)}</div>
       </div>`).join('');
+    const allDe = data.blocks.map(b => b.deutsch).join('\n');
 
-    const allDeutsch = data.blocks.map(b => b.deutsch).join('\n');
-
-    document.getElementById('textList').innerHTML = `
-      <div class="original-section">
-        <div class="orig-header">Original → Deutsch</div>
-        <div class="orig-card">${rows}</div>
-        <button class="copy-all-btn" onclick="copyAll(this,${JSON.stringify(allDeutsch)})">
-          Gesamte Übersetzung kopieren
-        </button>
+    document.getElementById('resContent').innerHTML = `
+      <div class="rc-row" style="display:flex;align-items:center;justify-content:space-between;padding:12px 14px">
+        <span style="font-size:12px;color:var(--muted)">🌍 ${esc(data.sprache||'?')} → Deutsch</span>
+        <button class="btn-copy" onclick="doCopy(this,${JSON.stringify(allDe)})">Alles kopieren</button>
+      </div>
+      <div class="res-card">
+        <div style="display:grid;grid-template-columns:1fr 1fr;padding:8px 14px 4px;gap:0">
+          <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);padding-right:10px;border-right:1px solid var(--border)">Original</div>
+          <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);padding-left:10px">Deutsch</div>
+        </div>
+        <div class="tr-table">${rows}</div>
       </div>`;
   }
 
-  // ── Canvas-Übersetzung ──────────────────────────────────────
+  // ── Sehenswürdigkeit-Ergebnis ────────────────────────────────
+  function renderLandmark(data) {
+    if (!data.success) { showError(data.error); return; }
+    if (!data.gefunden) {
+      document.getElementById('resContent').innerHTML =
+        `<div class="msg-box info">🗺️ Kein bekanntes Gebäude erkannt – versuche es mit einer anderen Perspektive.</div>`; return;
+    }
+
+    const fakten = (data.fakten||[]).map(f =>
+      `<div class="fact-chip">${esc(f)}</div>`).join('');
+
+    document.getElementById('resContent').innerHTML = `
+      <div class="res-card">
+        <div class="rc-row">
+          <div class="rc-text big">${esc(data.name)}</div>
+          <div class="rc-text sub" style="margin-top:4px">${esc(data.typ)} · ${esc(data.ort)}</div>
+        </div>
+        <div class="rc-row">
+          <div class="rc-label">Beschreibung</div>
+          <div class="rc-text body">${esc(data.kurzbeschreibung)}</div>
+        </div>
+        <div class="rc-row">
+          <div class="rc-label">Geschichte</div>
+          <div class="rc-text body">${esc(data.geschichte)}</div>
+        </div>
+        ${fakten ? `<div class="facts-wrap">${fakten}</div>` : ''}
+        ${data.besuchertipp ? `
+        <div class="rc-row" style="background:rgba(99,102,241,.06)">
+          <div class="rc-label">💡 Tipp</div>
+          <div class="rc-text body">${esc(data.besuchertipp)}</div>
+        </div>` : ''}
+      </div>`;
+  }
+
+  function showError(msg) {
+    document.getElementById('resContent').innerHTML =
+      `<div class="msg-box error">⚠️ ${esc(msg||'Unbekannter Fehler')}</div>`;
+  }
+
+  // ── Canvas-Übersetzung (Übersetzer-Modus) ────────────────────
   function paintTranslation(imageDataUrl, blocks) {
     return new Promise(resolve => {
       const img = new Image();
       img.onload = () => {
         const c = document.createElement('canvas');
-        c.width  = img.width;
-        c.height = img.height;
+        c.width = img.width; c.height = img.height;
         const ctx = c.getContext('2d');
         ctx.drawImage(img, 0, 0);
-
         for (const block of blocks) {
           const x = Math.round(block.x      / 100 * img.width);
           const y = Math.round(block.y      / 100 * img.height);
           const w = Math.round(block.breite / 100 * img.width);
           const h = Math.round(block.hoehe  / 100 * img.height);
           if (w < 6 || h < 6) continue;
-
-          // Hintergrundfarbe sampeln und Originaltextfläche übermalen
-          const [r, g, b] = sampleColor(ctx, x, y, w, h);
-          const bright = (r * 299 + g * 587 + b * 114) / 1000;
-          const textCol = bright > 140 ? '#111' : '#fff';
-
+          const [r,g,b] = sampleColor(ctx, x, y, w, h);
+          const bright = (r*299 + g*587 + b*114) / 1000;
           ctx.fillStyle = `rgb(${r},${g},${b})`;
-          ctx.fillRect(x - 2, y - 2, w + 4, h + 4);
-
-          // Deutschen Text passgenau einmalen
-          ctx.fillStyle = textCol;
+          ctx.fillRect(x-2, y-2, w+4, h+4);
+          ctx.fillStyle = bright > 140 ? '#111' : '#fff';
           ctx.textBaseline = 'middle';
           drawFittedText(ctx, block.deutsch, x, y, w, h);
         }
-
         resolve(c.toDataURL('image/jpeg', 0.92));
       };
       img.onerror = () => resolve(imageDataUrl);
@@ -380,103 +591,70 @@
     });
   }
 
-  // Text so groß wie möglich einpassen — gleiche Höhe wie Original
   function drawFittedText(ctx, text, x, y, w, h) {
-    // Zielgröße: Boxhöhe × 0.82 (entspricht cap-height des Originals)
     let fs = Math.max(8, Math.round(h * 0.82));
-
     ctx.font = `600 ${fs}px -apple-system, Arial, sans-serif`;
-
-    // Passt auf eine Zeile?
-    if (ctx.measureText(text).width <= w) {
-      ctx.fillText(text, x, y + h / 2);
-      return;
-    }
-
-    // Zeilenumbruch bei Zielgröße versuchen
+    if (ctx.measureText(text).width <= w) { ctx.fillText(text, x, y + h/2); return; }
     let lines = breakLines(ctx, text, w);
-    const totalH = lines.length * fs * 1.25;
-    if (totalH <= h * 1.6) {
-      const lineH = fs * 1.25;
-      const startY = y + (h - totalH) / 2 + fs / 2;
-      lines.forEach((l, i) => ctx.fillText(l, x, startY + i * lineH));
-      return;
+    if (lines.length * fs * 1.25 <= h * 1.6) {
+      const lh = fs * 1.25, sy = y + (h - lines.length*lh)/2 + fs/2;
+      lines.forEach((l,i) => ctx.fillText(l, x, sy + i*lh)); return;
     }
-
-    // Schriftgröße schrittweise verkleinern bis Text in Box passt
-    for (fs = fs - 1; fs >= 7; fs--) {
+    for (fs = fs-1; fs >= 7; fs--) {
       ctx.font = `600 ${fs}px -apple-system, Arial, sans-serif`;
       lines = breakLines(ctx, text, w);
-      const th = lines.length * fs * 1.25;
-      if (th <= h * 1.6) {
-        const lineH = fs * 1.25;
-        const startY = y + (h - th) / 2 + fs / 2;
-        lines.forEach((l, i) => ctx.fillText(l, x, startY + i * lineH));
-        return;
+      if (lines.length * fs * 1.25 <= h * 1.6) {
+        const lh = fs*1.25, sy = y + (h - lines.length*lh)/2 + fs/2;
+        lines.forEach((l,i) => ctx.fillText(l, x, sy + i*lh)); return;
       }
     }
-
-    // Letzter Ausweg: kleinste Größe, einfach zeichnen
     ctx.font = '600 7px -apple-system, Arial, sans-serif';
-    ctx.fillText(text, x, y + h / 2);
+    ctx.fillText(text, x, y + h/2);
   }
 
-  // Text in Zeilen aufteilen die in maxW passen
   function breakLines(ctx, text, maxW) {
-    const words = text.split(' ');
-    const lines = [];
-    let line = '';
-    for (const word of words) {
-      const test = line ? line + ' ' + word : word;
-      if (ctx.measureText(test).width > maxW && line) {
-        lines.push(line); line = word;
-      } else { line = test; }
+    const words = text.split(' '), lines = []; let line = '';
+    for (const w of words) {
+      const t = line ? line+' '+w : w;
+      if (ctx.measureText(t).width > maxW && line) { lines.push(line); line = w; }
+      else line = t;
     }
     if (line) lines.push(line);
     return lines;
   }
 
-  // Durchschnittliche Pixelfarbe in einer Region sampeln
   function sampleColor(ctx, x, y, w, h) {
     try {
-      const sx = Math.max(0, x), sy = Math.max(0, y);
-      const sw = Math.min(w, ctx.canvas.width  - sx);
-      const sh = Math.min(h, ctx.canvas.height - sy);
-      if (sw < 1 || sh < 1) return [235, 235, 220];
-      const d = ctx.getImageData(sx, sy, sw, sh).data;
-      let r = 0, g = 0, b = 0, n = 0;
-      for (let i = 0; i < d.length; i += 16) { r += d[i]; g += d[i+1]; b += d[i+2]; n++; }
-      return n ? [Math.round(r/n), Math.round(g/n), Math.round(b/n)] : [235, 235, 220];
-    } catch { return [235, 235, 220]; }
+      const sx=Math.max(0,x), sy=Math.max(0,y);
+      const sw=Math.min(w,ctx.canvas.width-sx), sh=Math.min(h,ctx.canvas.height-sy);
+      if (sw<1||sh<1) return [235,235,220];
+      const d = ctx.getImageData(sx,sy,sw,sh).data;
+      let r=0,g=0,b=0,n=0;
+      for (let i=0;i<d.length;i+=16){r+=d[i];g+=d[i+1];b+=d[i+2];n++;}
+      return n ? [Math.round(r/n),Math.round(g/n),Math.round(b/n)] : [235,235,220];
+    } catch { return [235,235,220]; }
   }
 
-  // ── Hilfsfunktionen ─────────────────────────────────────────
-  function closeResult() {
-    document.getElementById('resultScreen').classList.remove('open');
-  }
-
-  async function copyAll(btn, text) {
-    try {
-      await navigator.clipboard.writeText(text);
-      btn.textContent = 'Kopiert ✓'; btn.classList.add('ok');
-      setTimeout(() => { btn.textContent = 'Gesamte Übersetzung kopieren'; btn.classList.remove('ok'); }, 2000);
-    } catch {}
-  }
-
+  // ── Hilfsfunktionen ──────────────────────────────────────────
   function resizeCanvas(canvas, maxW) {
     if (canvas.width <= maxW) return canvas.toDataURL('image/jpeg', 0.82);
-    const s = maxW / canvas.width;
-    const t = document.createElement('canvas');
-    t.width = maxW; t.height = Math.round(canvas.height * s);
+    const s = maxW/canvas.width, t = document.createElement('canvas');
+    t.width=maxW; t.height=Math.round(canvas.height*s);
     t.getContext('2d').drawImage(canvas, 0, 0, t.width, t.height);
     return t.toDataURL('image/jpeg', 0.82);
   }
 
-  function esc(s) {
-    return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  async function doCopy(btn, text) {
+    try {
+      await navigator.clipboard.writeText(text);
+      btn.textContent='Kopiert ✓'; btn.classList.add('ok');
+      setTimeout(()=>{btn.textContent='Alles kopieren';btn.classList.remove('ok');},2000);
+    } catch {}
   }
 
-  startCamera();
+  function esc(s) {
+    return String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
 </script>
 </body>
 </html>
