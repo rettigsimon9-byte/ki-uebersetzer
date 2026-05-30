@@ -42,17 +42,26 @@ def translate():
                     {
                         'type': 'text',
                         'text': (
-                            'Analysiere dieses Bild und extrahiere allen sichtbaren Text.\n'
-                            'Übersetze ihn dann vollständig auf Deutsch.\n\n'
+                            'Analysiere dieses Bild. Erkenne alle Textstellen und übersetze sie auf Deutsch.\n'
+                            'Gib für jeden Textblock seine ungefähre Position im Bild als Prozentwert an.\n\n'
                             'Antworte NUR mit diesem JSON (kein Markdown, keine Erklärung):\n'
                             '{\n'
-                            '  "erkannte_sprache": "Name der Originalsprache",\n'
-                            '  "original": "Kompletter Originaltext aus dem Bild",\n'
-                            '  "uebersetzung": "Vollständige deutsche Übersetzung",\n'
-                            '  "kein_text": false\n'
-                            '}\n\n'
-                            'Falls kein lesbarer Text vorhanden:\n'
-                            '{"erkannte_sprache":"","original":"","uebersetzung":"","kein_text":true}'
+                            '  "sprache": "Name der Originalsprache",\n'
+                            '  "blocks": [\n'
+                            '    {\n'
+                            '      "original": "Originaltext des Blocks",\n'
+                            '      "deutsch": "Deutsche Übersetzung",\n'
+                            '      "x": 10,\n'
+                            '      "y": 20,\n'
+                            '      "breite": 45,\n'
+                            '      "hoehe": 6\n'
+                            '    }\n'
+                            '  ]\n'
+                            '}\n'
+                            'x/y = linke obere Ecke in % der Bildbreite/höhe. breite/hoehe in %.\n'
+                            'Jeden zusammenhängenden Textblock als eigenen Eintrag.\n\n'
+                            'Falls kein Text vorhanden:\n'
+                            '{"sprache":"","blocks":[],"kein_text":true}'
                         )
                     }
                 ]
@@ -60,7 +69,6 @@ def translate():
         )
 
         raw = message.content[0].text.strip()
-        # Strip markdown code fences if present
         if raw.startswith('```'):
             raw = raw.split('\n', 1)[1]
             raw = raw.rsplit('```', 1)[0]
@@ -69,7 +77,7 @@ def translate():
         return jsonify({'success': True, **result})
 
     except json.JSONDecodeError:
-        return jsonify({'success': True, 'erkannte_sprache': '', 'original': '', 'uebersetzung': raw, 'kein_text': False})
+        return jsonify({'success': False, 'error': 'Antwort konnte nicht verarbeitet werden.'}), 500
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
 
