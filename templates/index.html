@@ -392,25 +392,6 @@
 
   <img id="resultPhoto" src="" alt="">
 
-  <!-- Eingabefeld erscheint nach Foto, vor Analyse -->
-  <div id="inputStep" style="display:none;padding:12px 14px;background:var(--surface);border-bottom:1px solid var(--border);flex-shrink:0">
-    <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:var(--muted);margin-bottom:8px">
-      Zusätzliche Infos (optional)
-    </div>
-    <div style="display:flex;gap:8px">
-      <input id="hinweisInput" type="text" placeholder='z.B. "Griff lässt sich nicht ziehen"'
-        style="flex:1;background:var(--card);border:1px solid var(--border);color:var(--text);
-               padding:10px 14px;border-radius:12px;font-size:16px;outline:none;
-               font-family:inherit;-webkit-user-select:text;user-select:text;
-               -webkit-appearance:none;appearance:none;touch-action:manipulation"
-        onkeydown="if(event.key==='Enter')startAnalyse()">
-      <button onclick="startAnalyse()"
-        style="background:var(--accent);color:#fff;border:none;padding:10px 18px;border-radius:12px;font-size:14px;font-weight:600;cursor:pointer;white-space:nowrap;flex-shrink:0">
-        Analysieren →
-      </button>
-    </div>
-  </div>
-
   <div class="photo-divider" id="photoDivider" style="display:none">
     <div class="div-line"></div>
     <div class="div-dot" id="divIcon">↓</div>
@@ -418,6 +399,36 @@
   </div>
 
   <div class="res-content" id="resContent"></div>
+</div>
+
+<!-- Input-Overlay: position:fixed, AUSSERHALB jedes Scroll-Containers -->
+<div id="inputOverlay" style="
+  display:none; position:fixed; bottom:0; left:0; right:0; z-index:999;
+  background:var(--surface); border-top:2px solid var(--accent);
+  padding:14px 14px; padding-bottom:max(16px, env(safe-area-inset-bottom));
+  box-shadow: 0 -4px 24px rgba(0,0,0,.5);">
+  <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:var(--muted);margin-bottom:10px">
+    Zusätzliche Infos <span style="font-weight:400;text-transform:none;letter-spacing:0">(optional – z.B. "Griff klemmt")</span>
+  </div>
+  <div style="display:flex; gap:8px">
+    <input id="hinweisInput" type="text" inputmode="text" autocomplete="off"
+      placeholder='Details zum Problem…'
+      style="flex:1; min-width:0; background:var(--card); border:1px solid var(--border);
+             color:var(--text); padding:12px 14px; border-radius:12px;
+             font-size:16px; font-family:inherit; outline:none;
+             -webkit-appearance:none; appearance:none;">
+    <button onclick="startAnalyse()" style="
+      background:var(--accent); color:#fff; border:none;
+      padding:12px 18px; border-radius:12px;
+      font-size:15px; font-weight:700; cursor:pointer; flex-shrink:0">
+      →
+    </button>
+  </div>
+  <button onclick="startAnalyse()" style="
+    width:100%; margin-top:10px; background:var(--accent); color:#fff; border:none;
+    padding:13px; border-radius:12px; font-size:15px; font-weight:700; cursor:pointer">
+    Analysieren
+  </button>
 </div>
 
 <script>
@@ -450,7 +461,10 @@
     showScreen('dashboard');
   }
 
-  function backToCamera() { showScreen('cameraScreen'); }
+  function backToCamera() {
+    document.getElementById('inputOverlay').style.display = 'none';
+    showScreen('cameraScreen');
+  }
 
   // ── Kamera ───────────────────────────────────────────────────
   async function startCamera() {
@@ -486,14 +500,14 @@
     canvas.getContext('2d').drawImage(video, 0, 0);
     capturedImage = resizeCanvas(canvas, 1100);
 
-    // Ergebnis-Screen zeigen: Foto + Eingabefeld
+    // Ergebnis-Screen zeigen + Input-Overlay öffnen
     const m = MODES[currentMode];
     document.getElementById('resPill').textContent = m.pill;
     document.getElementById('resultPhoto').src = capturedImage;
     document.getElementById('hinweisInput').value = '';
     document.getElementById('resContent').innerHTML = '';
-    document.getElementById('inputStep').style.display = 'block';
     document.getElementById('photoDivider').style.display = 'none';
+    document.getElementById('inputOverlay').style.display = 'block';
 
     const rs = document.getElementById('resultScreen');
     rs.classList.add('active');
@@ -507,8 +521,8 @@
     const m = MODES[currentMode];
     const beschreibung = document.getElementById('hinweisInput').value.trim();
 
-    // Eingabefeld ausblenden, Divider + Spinner einblenden
-    document.getElementById('inputStep').style.display = 'none';
+    // Overlay ausblenden, Divider + Spinner einblenden
+    document.getElementById('inputOverlay').style.display = 'none';
     document.getElementById('photoDivider').style.display = 'flex';
     document.getElementById('resContent').innerHTML =
       `<div class="loading-wrap"><div class="spinner"></div><div style="color:var(--muted);font-size:14px">KI analysiert…</div></div>`;
