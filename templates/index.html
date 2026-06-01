@@ -468,10 +468,9 @@
   // ── Aufnehmen ────────────────────────────────────────────────
   let capturedImage = null;
 
-  async function capture() {
+  function capture() {
     const video = document.getElementById('video');
     const canvas = document.getElementById('canvas');
-    const btn = document.getElementById('btnCapture');
     if (!stream) return;
 
     const fl = document.getElementById('flash');
@@ -481,9 +480,26 @@
     canvas.getContext('2d').drawImage(video, 0, 0);
     capturedImage = resizeCanvas(canvas, 1100);
 
-    const beschreibung = '';
+    // Hinweis-Screen zeigen
+    document.getElementById('hintThumb').src = capturedImage;
+    document.getElementById('hinweisInput').value = '';
+    document.getElementById('hintScreen').style.display = 'block';
+    setTimeout(() => document.getElementById('hinweisInput').focus(), 100);
+  }
 
-    // Ergebnis-Screen zeigen + Analyse starten
+  function analyseWithHint() {
+    const beschreibung = document.getElementById('hinweisInput').value.trim();
+    document.getElementById('hintScreen').style.display = 'none';
+    startAnalyse(beschreibung);
+  }
+
+  function skipHint() {
+    document.getElementById('hintScreen').style.display = 'none';
+    startAnalyse('');
+  }
+
+  async function startAnalyse(beschreibung) {
+    const btn = document.getElementById('btnCapture');
     const m = MODES[currentMode];
     document.getElementById('resPill').textContent = m.pill;
     document.getElementById('resultPhoto').src = capturedImage;
